@@ -1,0 +1,10 @@
+[package]
+name = "racer-tracer"
+version = "0.1.0"
+authors = ["Sakarias Johansson <sakarias.johansson@goodbyekansas.com>"]
+edition = "2021"
+
+[dependencies]
+minifb = "0.23"
+tokio = { version = "1.14.0", features = ["macros", "rt", "rt-multi-thread"] }
+thiserror = "1"
