@@ -19,6 +19,6 @@ impl Ray {
     }
 
     pub fn at(&self, go_length: f64) -> Vec3 {
-        self.origin.clone() + go_length * self.direction.clone()
+        self.origin + go_length * self.direction
     }
 }

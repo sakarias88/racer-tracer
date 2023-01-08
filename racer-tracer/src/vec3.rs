@@ -86,15 +86,31 @@ impl ops::AddAssign<Vec3> for Vec3 {
     }
 }
 
+fn vec_sub(v1: &[f64; 3], v2: &[f64; 3]) -> Vec3 {
+    Vec3::new(v1[0] - v2[0], v1[1] - v2[1], v1[2] - v2[2])
+}
+
 impl ops::Sub<Vec3> for Vec3 {
     type Output = Vec3;
 
     fn sub(self, rhs: Vec3) -> Self::Output {
-        Vec3::new(
-            rhs.data[0] - self.data[0],
-            rhs.data[1] - self.data[1],
-            rhs.data[2] - self.data[2],
-        )
+        vec_sub(&self.data, &rhs.data)
+    }
+}
+
+impl ops::Sub<&Vec3> for Vec3 {
+    type Output = Vec3;
+
+    fn sub(self, rhs: &Vec3) -> Self::Output {
+        vec_sub(&self.data, &rhs.data)
+    }
+}
+
+impl ops::Sub<Vec3> for &Vec3 {
+    type Output = Vec3;
+
+    fn sub(self, rhs: Vec3) -> Self::Output {
+        vec_sub(&self.data, &rhs.data)
     }
 }
 
@@ -151,7 +167,7 @@ impl ops::Mul<&Vec3> for f64 {
     type Output = Vec3;
 
     fn mul(self, rhs: &Vec3) -> Self::Output {
-        Vec3::new(rhs.data[0] * self, rhs.data[1] * self, rhs.data[2] * self)
+        *rhs * self
     }
 }
 
@@ -171,7 +187,7 @@ impl ops::Mul<Vec3> for f64 {
     type Output = Vec3;
 
     fn mul(self, rhs: Vec3) -> Self::Output {
-        rhs * self
+        Vec3::new(rhs.data[0] * self, rhs.data[1] * self, rhs.data[2] * self)
     }
 }
 
@@ -191,6 +207,14 @@ impl ops::Neg for Vec3 {
     }
 }
 
+impl PartialEq for Vec3 {
+    fn eq(&self, other: &Self) -> bool {
+        self.data[0] == other.data[0]
+            && self.data[1] == other.data[1]
+            && self.data[2] == other.data[2]
+    }
+}
+
 impl fmt::Display for Vec3 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(
@@ -200,5 +224,71 @@ impl fmt::Display for Vec3 {
             )
             .as_str(),
         )
+    }
+}
+
+impl std::fmt::Debug for Vec3 {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Vec3").field("data", &self.data).finish()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn add() {
+        let v1 = Vec3::new(1.0, 2.0, 3.0);
+        let v2 = Vec3::new(2.0, 4.0, 6.0);
+        let v3 = v1 + v2;
+        let v4 = v2 + v1;
+
+        assert_eq!(*v3.x(), 3.0);
+        assert_eq!(*v3.y(), 6.0);
+        assert_eq!(*v3.z(), 9.0);
+        assert_eq!(v3, v4);
+    }
+
+    #[test]
+    fn sub() {
+        let v1 = Vec3::new(1.0, 2.0, 3.0);
+        let v2 = Vec3::new(2.0, 4.0, 6.0);
+        let v3 = v1 - v2;
+        assert_eq!(v3.x(), &-1.0);
+        assert_eq!(v3.y(), &-2.0);
+        assert_eq!(v3.z(), &-3.0);
+
+        let v4 = v2 - v1;
+        assert_eq!(v4.x(), &1.0);
+        assert_eq!(v4.y(), &2.0);
+        assert_eq!(v4.z(), &3.0);
+    }
+
+    #[test]
+    fn mul() {
+        let v1 = Vec3::new(1.0, -2.0, 3.0);
+        let v2 = v1 * 5.0;
+
+        assert_eq!(v2.x(), &5.0);
+        assert_eq!(v2.y(), &-10.0);
+        assert_eq!(v2.z(), &15.0);
+
+        let v3 = Vec3::new(4.0, 8.0, 16.0);
+        let v4 = v1 * v3;
+
+        assert_eq!(v4.x(), &4.0);
+        assert_eq!(v4.y(), &-16.0);
+        assert_eq!(v4.z(), &48.0);
+    }
+
+    #[test]
+    fn div() {
+        let v1 = Vec3::new(1.0, -2.0, 3.0);
+        let v2 = v1 / 2.0;
+
+        assert_eq!(v2.x(), &0.5);
+        assert_eq!(v2.y(), &-1.0);
+        assert_eq!(v2.z(), &1.5);
     }
 }

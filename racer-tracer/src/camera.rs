@@ -1,4 +1,5 @@
 use crate::image::Image;
+use crate::ray::Ray;
 use crate::vec3::Vec3;
 
 #[derive(Clone)]
@@ -9,7 +10,7 @@ pub struct Camera {
     pub origin: Vec3,
     pub horizontal: Vec3,
     pub vertical: Vec3,
-    pub lower_left_corner: Vec3,
+    pub upper_left_corner: Vec3,
 }
 
 impl Camera {
@@ -25,10 +26,16 @@ impl Camera {
             origin,
             horizontal,
             vertical,
-            lower_left_corner: origin
+            upper_left_corner: origin + vertical / 2.0
                 - horizontal / 2.0
-                - vertical / 2.0
                 - Vec3::new(0.0, 0.0, focal_length),
         }
+    }
+
+    pub fn get_ray(&self, u: f64, v: f64) -> Ray {
+        Ray::new(
+            self.origin,
+            self.upper_left_corner + u * self.horizontal - v * self.vertical - self.origin,
+        )
     }
 }
