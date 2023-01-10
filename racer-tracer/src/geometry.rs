@@ -47,8 +47,4 @@ impl Default for HitRecord {
 pub trait Hittable {
     //pub trait Hittable {
     fn hit(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord>;
-
-    // Manual ugly clone since forcing on Clone would make it a super trait.
-    // Clone requires Sized and super traits cannot be Sized.
-    fn clone_box(&self) -> Box<dyn Hittable>;
 }

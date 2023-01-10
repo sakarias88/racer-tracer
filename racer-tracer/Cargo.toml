@@ -6,7 +6,7 @@ edition = "2021"
 
 [dependencies]
 minifb = "0.23"
-tokio = { version = "1.14.0", features = ["macros", "rt", "rt-multi-thread"] }
 thiserror = "1"
 futures = "0.3"
 rand = "0.8.5"
+rayon = "1.6.1"

@@ -8,13 +8,18 @@ mod scene;
 mod util;
 mod vec3;
 
-use std::vec::Vec;
+use std::{
+    borrow::Borrow,
+    sync::{Arc, Mutex, RwLock},
+    vec::Vec,
+};
 
-use futures::{select, stream::FuturesUnordered, stream::StreamExt};
 use geometry::Hittable;
 use minifb::{Key, Window, WindowOptions};
+use rayon::prelude::*;
 
 use crate::camera::Camera;
+use crate::error::TracerError;
 use crate::geometry::sphere::Sphere;
 use crate::image::Image;
 use crate::ray::Ray;
@@ -22,41 +27,66 @@ use crate::scene::Scene;
 use crate::util::random_double;
 use crate::vec3::Vec3;
 
-fn ray_color(scene: &Scene, ray: &Ray) -> Vec3 {
+fn ray_color(scene: &dyn Hittable, ray: &Ray) -> Vec3 {
     if let Some(hit_record) = scene.hit(ray, 0.0, std::f64::INFINITY) {
         //return hit_record.color;
         return 0.5 * (hit_record.normal + Vec3::new(1.0, 1.0, 1.0));
     }
 
+    // TODO: make sky part of scene.
     // Sky
     let unit_direction = ray.direction().unit_vector();
     let t = 0.5 * (unit_direction.y() + 1.0);
     (1.0 - t) * Vec3::new(1.0, 1.0, 1.0) + t * Vec3::new(0.5, 0.7, 1.0)
 }
 
-// TODO: Rustify
-async fn raytrace(
-    scene: Scene,
-    camera: Camera,
-    image: Image,
-    row: usize,
-) -> Result<(usize, Vec<u32>), error::TracerError> {
-    let mut buffer: Vec<u32> = vec![0; image.width as usize];
+fn raytrace(scene: &dyn Hittable, camera: &Camera, image: &Image, row: usize) -> Vec<u32> {
     let mut colors: Vec<Vec3> = vec![Vec3::default(); image.width as usize];
-
-    for i in 0..buffer.len() {
+    colors.iter_mut().enumerate().for_each(|(i, col)| {
         for _ in 0..image.samples_per_pixel {
             let u: f64 = (i as f64 + random_double()) / (image.width - 1) as f64;
             let v: f64 = (row as f64 + random_double()) / (image.height - 1) as f64;
-            colors[i] += ray_color(&scene, &camera.get_ray(u, v));
+            *col += ray_color(scene, &camera.get_ray(u, v));
         }
-    }
+    });
 
+    // TODO: Could do rolling average
+    let mut buffer: Vec<u32> = vec![0; image.width as usize];
     for i in 0..image.width {
         buffer[i] = (colors[i] / image.samples_per_pixel as f64).as_color();
     }
 
-    Ok((row, buffer))
+    buffer
+}
+
+type Data = (Arc<RwLock<Vec<u32>>>, Arc<Camera>, Arc<Image>, usize);
+
+fn render(
+    buffer: Arc<RwLock<Vec<u32>>>,
+    camera: Arc<Camera>,
+    image: Arc<Image>,
+    scene: Box<dyn Hittable + std::marker::Sync>,
+) {
+    let scene: &(dyn Hittable + Sync) = scene.borrow();
+
+    let v: Vec<Data> = (0..image.height)
+        .map(|row| {
+            (
+                Arc::clone(&buffer),
+                Arc::clone(&camera),
+                Arc::clone(&image),
+                row,
+            )
+        })
+        .collect();
+
+    v.par_iter().for_each(|(buf, camera, image, row)| {
+        let start = row * image.width;
+        let end = start + image.width;
+        let col_buf = raytrace(scene.borrow(), camera, image, *row);
+        let mut buf = buf.write().expect("Failed to get screen buffer lock."); // TODO: No except
+        buf[start..end].copy_from_slice(col_buf.as_slice());
+    });
 }
 
 fn create_scene() -> Scene {
@@ -72,70 +102,67 @@ fn create_scene() -> Scene {
     scene
 }
 
-async fn run(
-    rows_per_update: u32,
-    aspect_ratio: f64,
-    screen_width: usize,
-    samples: usize,
-) -> Result<(), error::TracerError> {
-    let image = image::Image::new(aspect_ratio, screen_width, samples);
-    let camera = camera::Camera::new(&image, 2.0, 1.0);
-    let scene = create_scene();
+fn run(aspect_ratio: f64, screen_width: usize, samples: usize) -> Result<(), TracerError> {
+    let image = Arc::new(image::Image::new(aspect_ratio, screen_width, samples));
+    let camera = Arc::new(camera::Camera::new(&image, 2.0, 1.0));
+    let scene: Box<dyn Hittable + Sync + Send> = Box::new(create_scene());
+    let screen_buffer: Arc<RwLock<Vec<u32>>> =
+        Arc::new(RwLock::new(vec![0; image.width * image.height]));
 
-    let mut screen_buffer: Vec<u32> = vec![0; image.width * image.height];
-    let mut window = Window::new(
-        "racer-tracer",
-        image.width,
-        image.height,
-        WindowOptions::default(),
-    )
-    .expect("Unable to create window");
-    window.limit_update_rate(Some(std::time::Duration::from_micros(16600)));
+    let window_res: Arc<Mutex<Result<(), TracerError>>> = Arc::new(Mutex::new(Ok(())));
 
-    let mut futs = FuturesUnordered::new();
-    // One future per row is a bit high.
-    // Could do something less spammy.
-    for h in 0..image.height {
-        // TODO: Either clone all or lock em all.
-        futs.push(raytrace(scene.clone(), camera.clone(), image.clone(), h));
-    }
+    rayon::scope(|s| {
+        s.spawn(|_| {
+            render(
+                Arc::clone(&screen_buffer),
+                camera,
+                Arc::clone(&image),
+                scene,
+            )
+        });
+        s.spawn(|_| {
+            let result = Window::new(
+                "racer-tracer",
+                image.width,
+                image.height,
+                WindowOptions::default(),
+            )
+            .map_err(|e| TracerError::FailedToCreateWindow(e.to_string()))
+            .map(|mut window| {
+                window.limit_update_rate(Some(std::time::Duration::from_micros(16600)));
+                window
+            })
+            .and_then(|mut window| {
+                // TODO: Only re-render window then buffer is changed
+                while window.is_open() && !window.is_key_down(Key::Escape) {
+                    // Sleep a bit to not hog the lock on the buffer all the time.
+                    std::thread::sleep(std::time::Duration::from_secs(1));
 
-    // TODO: use rayon
-    // Since it's cooperative multitasking this is not really helpful at the moment.
-    // You will get pretty much get the same result without the tokio asyncness.
-    // using rayon with threads is a different matter.
-    let mut complete = false;
-    while window.is_open() && !window.is_key_down(Key::Escape) {
-        if !complete {
-            for _ in 0..rows_per_update {
-                select! {
-                    res = futs.select_next_some() => {
-                        let row_buffer = res.expect("Expected to get data");
-                        let start = row_buffer.0 * image.width;
-                        let end = start + image.width;
-                        screen_buffer[start..end].copy_from_slice(row_buffer.1.as_slice());
-                    },
-                    complete => {
-                        if !complete {
-                            println!("Completed!");
-                        }
-                        complete = true;
-                    },
+                    screen_buffer
+                        .read()
+                        .map_err(|e| TracerError::FailedToUpdateWindow(e.to_string()))
+                        .and_then(|buf| {
+                            window
+                                .update_with_buffer(&buf, image.width, image.height)
+                                .map_err(|e| TracerError::FailedToUpdateWindow(e.to_string()))
+                        })?
                 }
+                Ok(())
+            });
+
+            if result.is_err() {
+                let mut a = window_res.lock().expect("Failed to get result lock.");
+                *a = result;
             }
-        }
+        });
+    });
 
-        window
-            .update_with_buffer(&screen_buffer, image.width, image.height)
-            .map_err(|e| error::TracerError::FailedToUpdateWindow(e.to_string()))?;
-    }
-
-    Ok(())
+    let res = (window_res.lock().expect("Failed to get result lock.")).clone();
+    res
 }
 
-#[tokio::main]
-async fn main() {
-    if let Err(e) = run(100, 16.0 / 9.0, 1200, 100).await {
+fn main() {
+    if let Err(e) = run(16.0 / 9.0, 1200, 10) {
         eprintln!("{}", e);
         std::process::exit(e.into())
     }

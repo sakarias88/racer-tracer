@@ -1,7 +1,7 @@
 use crate::geometry::Hittable;
 
 pub struct Scene {
-    objects: Vec<Box<dyn Hittable>>,
+    objects: Vec<Box<dyn Hittable + Sync + Send>>,
 }
 
 impl Scene {
@@ -11,24 +11,8 @@ impl Scene {
         }
     }
 
-    pub fn add(&mut self, hittable: Box<dyn Hittable>) {
+    pub fn add(&mut self, hittable: Box<dyn Hittable + Sync + Send>) {
         self.objects.push(hittable);
-    }
-}
-
-// TODO: What to do?
-// Cloning everything is nice since then every task can do whatever they like.
-// Cloning everything is bad becuse you copy everything which takes time.
-// Could also put locks on the Scene but then it becomes this global object that everyone
-// wants to access at the same time.
-// Will do some laborations later and decide on a solution.
-impl Clone for Scene {
-    fn clone(&self) -> Self {
-        let mut objects = Vec::with_capacity(self.objects.capacity());
-        for i in self.objects.iter() {
-            objects.push(i.clone_box());
-        }
-        Self { objects }
     }
 }
 
@@ -50,9 +34,5 @@ impl Hittable for Scene {
         }
 
         rec
-    }
-
-    fn clone_box(&self) -> Box<dyn Hittable> {
-        Box::new(self.clone())
     }
 }

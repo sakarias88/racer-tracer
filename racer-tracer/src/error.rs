@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-#[derive(Error, Debug)]
+#[derive(Clone, Error, Debug)]
 pub enum TracerError {
     #[error("Unknown error: {message}")]
     Unknown { message: String, exit_code: i32 },

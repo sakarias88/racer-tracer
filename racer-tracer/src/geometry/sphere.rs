@@ -20,16 +20,6 @@ impl Sphere {
     }
 }
 
-impl Clone for Sphere {
-    fn clone(&self) -> Self {
-        Self {
-            pos: self.pos,
-            radius: self.radius,
-            material: self.material,
-        }
-    }
-}
-
 impl Hittable for Sphere {
     fn hit(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
         let oc = ray.origin() - self.pos;
@@ -60,9 +50,5 @@ impl Hittable for Sphere {
         let mut hit_record = HitRecord::new(point, root, self.material);
         hit_record.set_face_normal(ray, outward_normal);
         Some(hit_record)
-    }
-
-    fn clone_box(&self) -> Box<dyn Hittable> {
-        Box::new(self.clone())
     }
 }
