@@ -3,6 +3,7 @@ mod error;
 mod camera;
 mod geometry;
 mod image;
+mod material;
 mod ray;
 mod scene;
 mod util;
@@ -11,26 +12,43 @@ mod vec3;
 use std::{
     borrow::Borrow,
     sync::{Arc, Mutex, RwLock},
+    time::{Duration, Instant},
     vec::Vec,
 };
 
-use geometry::Hittable;
+use material::{lambertian::Lambertian, metal::Metal, Material};
 use minifb::{Key, Window, WindowOptions};
 use rayon::prelude::*;
+use vec3::Color;
 
-use crate::camera::Camera;
-use crate::error::TracerError;
-use crate::geometry::sphere::Sphere;
-use crate::image::Image;
-use crate::ray::Ray;
-use crate::scene::Scene;
-use crate::util::random_double;
-use crate::vec3::Vec3;
+use crate::{
+    camera::Camera,
+    error::TracerError,
+    geometry::sphere::Sphere,
+    geometry::Hittable,
+    image::Image,
+    ray::Ray,
+    scene::Scene,
+    util::random_double,
+    vec3::Vec3,
+    vec3::{random_in_hemisphere, random_unit_vector},
+};
 
-fn ray_color(scene: &dyn Hittable, ray: &Ray) -> Vec3 {
-    if let Some(hit_record) = scene.hit(ray, 0.0, std::f64::INFINITY) {
+fn ray_color(scene: &dyn Hittable, ray: &Ray, depth: usize) -> Vec3 {
+    if depth == 0 {
+        return Vec3::default();
+    }
+
+    if let Some(rec) = scene.hit(ray, 0.001, std::f64::INFINITY) {
+        if let Some((scattered, attenuation)) = rec.material.scatter(ray, &rec) {
+            return attenuation * ray_color(scene, &scattered, depth - 1);
+        }
+        return Color::default();
+        //let target = rec.point + random_in_hemisphere(&rec.normal);
+        //let target = rec.point + rec.normal + random_unit_vector();
+        //return 0.5 * ray_color(scene, &Ray::new(rec.point, target - rec.point), depth - 1);
         //return hit_record.color;
-        return 0.5 * (hit_record.normal + Vec3::new(1.0, 1.0, 1.0));
+        //return 0.5 * (hit_record.normal + Vec3::new(1.0, 1.0, 1.0));
     }
 
     // TODO: make sky part of scene.
@@ -40,23 +58,70 @@ fn ray_color(scene: &dyn Hittable, ray: &Ray) -> Vec3 {
     (1.0 - t) * Vec3::new(1.0, 1.0, 1.0) + t * Vec3::new(0.5, 0.7, 1.0)
 }
 
-fn raytrace(scene: &dyn Hittable, camera: &Camera, image: &Image, row: usize) -> Vec<u32> {
+fn flush(
+    row: usize,
+    width: usize,
+    start: usize,
+    count: usize,
+    samples: usize,
+    source: &[Vec3],
+    dest: &RwLock<Vec<u32>>,
+) {
+    let mut buf = dest
+        .write()
+        .expect("Failed to get write guard when flushing data.");
+
+    for i in 0..count {
+        buf[row * width + start + i] = source[start + i].scale_sqrt(samples).as_color();
+    }
+}
+
+fn raytrace(
+    buffer: &RwLock<Vec<u32>>,
+    scene: &dyn Hittable,
+    camera: &Camera,
+    image: &Image,
+    row: usize,
+    max_depth: usize,
+) {
+    let mut now = Instant::now();
+    let flush_delay = Duration::from_millis(50 + ((random_double() * 2000.0) as u64));
+    let mut flush_start: usize = 0;
     let mut colors: Vec<Vec3> = vec![Vec3::default(); image.width as usize];
-    colors.iter_mut().enumerate().for_each(|(i, col)| {
+
+    for i in 0..colors.len() {
         for _ in 0..image.samples_per_pixel {
             let u: f64 = (i as f64 + random_double()) / (image.width - 1) as f64;
             let v: f64 = (row as f64 + random_double()) / (image.height - 1) as f64;
-            *col += ray_color(scene, &camera.get_ray(u, v));
+            colors[i] += ray_color(scene, &camera.get_ray(u, v), max_depth);
         }
-    });
 
-    // TODO: Could do rolling average
-    let mut buffer: Vec<u32> = vec![0; image.width as usize];
-    for i in 0..image.width {
-        buffer[i] = (colors[i] / image.samples_per_pixel as f64).as_color();
+        // Update the screen buffer every now and again.
+        if now.elapsed() > flush_delay {
+            now = Instant::now();
+            flush(
+                row,
+                image.width,
+                flush_start,
+                i - flush_start,
+                image.samples_per_pixel,
+                colors.as_slice(),
+                buffer,
+            );
+            flush_start = i;
+        }
     }
 
-    buffer
+    // Flush last part of the buffer.
+    flush(
+        row,
+        image.width,
+        flush_start,
+        colors.len() - flush_start,
+        image.samples_per_pixel,
+        colors.as_slice(),
+        buffer,
+    );
 }
 
 type Data = (Arc<RwLock<Vec<u32>>>, Arc<Camera>, Arc<Image>, usize);
@@ -66,9 +131,9 @@ fn render(
     camera: Arc<Camera>,
     image: Arc<Image>,
     scene: Box<dyn Hittable + std::marker::Sync>,
+    max_depth: usize,
 ) {
     let scene: &(dyn Hittable + Sync) = scene.borrow();
-
     let v: Vec<Data> = (0..image.height)
         .map(|row| {
             (
@@ -81,28 +146,65 @@ fn render(
         .collect();
 
     v.par_iter().for_each(|(buf, camera, image, row)| {
-        let start = row * image.width;
-        let end = start + image.width;
-        let col_buf = raytrace(scene.borrow(), camera, image, *row);
-        let mut buf = buf.write().expect("Failed to get screen buffer lock."); // TODO: No except
-        buf[start..end].copy_from_slice(col_buf.as_slice());
+        raytrace(buf, scene, camera, image, *row, max_depth);
     });
 }
 
+type SharedMaterial = Arc<Box<dyn Material + Send + Sync>>;
 fn create_scene() -> Scene {
     let mut scene = Scene::new();
-    let sphere1 = Sphere::new(Vec3::new(0.0, 0.0, -1.0), 0.5, Vec3::new(0.0, 1.0, 0.0));
-    let sphere2 = Sphere::new(
+    let material_ground: SharedMaterial =
+        Arc::new(Box::new(Lambertian::new(Color::new(0.8, 0.8, 0.0))));
+    let material_center: SharedMaterial =
+        Arc::new(Box::new(Lambertian::new(Color::new(0.7, 0.3, 0.3))));
+    let material_left: SharedMaterial =
+        Arc::new(Box::new(Metal::new(Color::new(0.8, 0.8, 0.8), 0.3)));
+    let material_right: SharedMaterial =
+        Arc::new(Box::new(Metal::new(Color::new(0.8, 0.6, 0.2), 0.1)));
+
+    scene.add(Box::new(Sphere::new(
         Vec3::new(0.0, -100.5, -1.0),
         100.0,
-        Vec3::new(0.0, 1.0, 0.0),
-    );
+        Arc::clone(&material_ground),
+    )));
+    scene.add(Box::new(Sphere::new(
+        Vec3::new(0.0, 0.0, -1.0),
+        0.5,
+        Arc::clone(&material_center),
+    )));
+    scene.add(Box::new(Sphere::new(
+        Vec3::new(-1.0, 0.0, -1.0),
+        0.5,
+        Arc::clone(&material_left),
+    )));
+    scene.add(Box::new(Sphere::new(
+        Vec3::new(1.0, 0.0, -1.0),
+        0.5,
+        Arc::clone(&material_right),
+    )));
+    scene
+    // Materials
+    /*    let red: Arc<Box<dyn Material + Send + Sync>> =
+        Arc::new(Box::new(Lambertian::new(Color::new(1.0, 0.0, 0.0))));
+    let green: Arc<Box<dyn Material + Send + Sync>> =
+        Arc::new(Box::new(Lambertian::new(Color::new(0.0, 1.0, 0.0))));
+    let metal_red: Arc<Box<dyn Material + Send + Sync>> =
+        Arc::new(Box::new(Metal::new(Color::new(1.0, 0.0, 0.0))));
+
+    // Geometry
+    let sphere1 = Sphere::new(Vec3::new(0.0, 0.0, -1.0), 0.5, Arc::clone(&metal_red));
+    let sphere2 = Sphere::new(Vec3::new(0.0, -100.5, -1.0), 100.0, Arc::clone(&green));
     scene.add(Box::new(sphere1));
     scene.add(Box::new(sphere2));
-    scene
+    scene*/
 }
 
-fn run(aspect_ratio: f64, screen_width: usize, samples: usize) -> Result<(), TracerError> {
+fn run(
+    aspect_ratio: f64,
+    screen_width: usize,
+    samples: usize,
+    max_depth: usize,
+) -> Result<(), TracerError> {
     let image = Arc::new(image::Image::new(aspect_ratio, screen_width, samples));
     let camera = Arc::new(camera::Camera::new(&image, 2.0, 1.0));
     let scene: Box<dyn Hittable + Sync + Send> = Box::new(create_scene());
@@ -118,6 +220,7 @@ fn run(aspect_ratio: f64, screen_width: usize, samples: usize) -> Result<(), Tra
                 camera,
                 Arc::clone(&image),
                 scene,
+                max_depth,
             )
         });
         s.spawn(|_| {
@@ -133,10 +236,9 @@ fn run(aspect_ratio: f64, screen_width: usize, samples: usize) -> Result<(), Tra
                 window
             })
             .and_then(|mut window| {
-                // TODO: Only re-render window then buffer is changed
                 while window.is_open() && !window.is_key_down(Key::Escape) {
                     // Sleep a bit to not hog the lock on the buffer all the time.
-                    std::thread::sleep(std::time::Duration::from_secs(1));
+                    std::thread::sleep(std::time::Duration::from_millis(100));
 
                     screen_buffer
                         .read()
@@ -162,7 +264,7 @@ fn run(aspect_ratio: f64, screen_width: usize, samples: usize) -> Result<(), Tra
 }
 
 fn main() {
-    if let Err(e) = run(16.0 / 9.0, 1200, 10) {
+    if let Err(e) = run(16.0 / 9.0, 1200, 1000, 50) {
         eprintln!("{}", e);
         std::process::exit(e.into())
     }

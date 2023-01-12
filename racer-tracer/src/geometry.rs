@@ -1,5 +1,8 @@
 pub mod sphere;
 
+use std::sync::Arc;
+
+use crate::material::Material;
 use crate::ray::Ray;
 use crate::vec3::Vec3;
 
@@ -8,17 +11,17 @@ pub struct HitRecord {
     pub normal: Vec3,
     pub t: f64,
     pub front_face: bool,
-    pub color: Vec3,
+    pub material: Arc<Box<dyn Material + Send + Sync>>,
 }
 
 impl HitRecord {
-    fn new(point: Vec3, t: f64, color: Vec3) -> Self {
+    fn new(point: Vec3, t: f64, material: Arc<Box<dyn Material + Send + Sync>>) -> Self {
         Self {
             point,
             normal: Vec3::default(),
             t,
             front_face: true,
-            color,
+            material,
         }
     }
 
@@ -29,18 +32,6 @@ impl HitRecord {
         } else {
             -outward_normal
         };
-    }
-}
-
-impl Default for HitRecord {
-    fn default() -> Self {
-        HitRecord {
-            point: Vec3::default(),
-            normal: Vec3::default(),
-            t: 0.0,
-            front_face: true,
-            color: Vec3::default(),
-        }
     }
 }
 

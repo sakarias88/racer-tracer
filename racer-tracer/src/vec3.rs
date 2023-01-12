@@ -1,9 +1,13 @@
 use std::{fmt, ops};
 
+use crate::util::{random_double, random_double_range};
+
 #[derive(Default, Clone, Copy)]
 pub struct Vec3 {
     data: [f64; 3],
 }
+
+pub type Color = Vec3;
 
 impl Vec3 {
     pub fn new(x: f64, y: f64, z: f64) -> Vec3 {
@@ -48,6 +52,60 @@ impl Vec3 {
         let blue: u32 = (self.data[2] * 255.0) as u32;
         ((red as u32) << 16) | ((green as u32) << 8) | blue as u32
     }
+
+    pub fn random() -> Self {
+        Vec3 {
+            data: [random_double(), random_double(), random_double()],
+        }
+    }
+
+    pub fn random_range(min: f64, max: f64) -> Self {
+        Vec3 {
+            data: [
+                random_double_range(min, max),
+                random_double_range(min, max),
+                random_double_range(min, max),
+            ],
+        }
+    }
+
+    pub fn scale_sqrt(mut self, samples: usize) -> Vec3 {
+        let scale = 1.0 / samples as f64;
+        self.data[0] = (scale * self.data[0]).sqrt();
+        self.data[1] = (scale * self.data[1]).sqrt();
+        self.data[2] = (scale * self.data[2]).sqrt();
+        self
+    }
+
+    pub fn near_zero(&self) -> bool {
+        let s = 1e-8;
+        self.data[0].abs() < s && self.data[1].abs() < s && self.data[2].abs() < s
+    }
+}
+
+pub fn reflect(v1: &Vec3, v2: &Vec3) -> Vec3 {
+    v1 - 2.0 * v1.dot(v2) * v2
+}
+
+pub fn random_in_unit_sphere() -> Vec3 {
+    let mut v = Vec3::random_range(-1.0, 1.0);
+    while v.length_squared() >= 1.0 {
+        v = Vec3::random_range(-1.0, 1.0);
+    }
+    v
+}
+
+pub fn random_in_hemisphere(normal: &Vec3) -> Vec3 {
+    let unit_sphere = random_in_unit_sphere();
+    if unit_sphere.dot(normal) > 0.0 {
+        unit_sphere
+    } else {
+        -unit_sphere
+    }
+}
+
+pub fn random_unit_vector() -> Vec3 {
+    random_in_unit_sphere().unit_vector()
 }
 
 pub fn dot(v1: &Vec3, v2: &Vec3) -> f64 {

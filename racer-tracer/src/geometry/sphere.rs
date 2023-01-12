@@ -1,17 +1,19 @@
 use std::option::Option;
+use std::sync::Arc;
 
 use crate::geometry::{HitRecord, Hittable};
+use crate::material::Material;
 use crate::ray::Ray;
 use crate::vec3::Vec3;
 
 pub struct Sphere {
     pos: Vec3,
     radius: f64,
-    material: Vec3, // Just a color for now.
+    material: Arc<Box<dyn Material + Sync + Send>>, // Just a color for now.
 }
 
 impl Sphere {
-    pub fn new(pos: Vec3, radius: f64, material: Vec3) -> Self {
+    pub fn new(pos: Vec3, radius: f64, material: Arc<Box<dyn Material + Sync + Send>>) -> Self {
         Self {
             pos,
             radius,
@@ -47,7 +49,7 @@ impl Hittable for Sphere {
         let point = ray.at(root);
         let outward_normal = (point - self.pos) / self.radius;
 
-        let mut hit_record = HitRecord::new(point, root, self.material);
+        let mut hit_record = HitRecord::new(point, root, Arc::clone(&self.material));
         hit_record.set_face_normal(ray, outward_normal);
         Some(hit_record)
     }
