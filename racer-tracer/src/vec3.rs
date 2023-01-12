@@ -26,6 +26,44 @@ impl Vec3 {
         &self.data[2]
     }
 
+    pub fn add(&mut self, v: Vec3) {
+        self.data[0] += v.data[0];
+        self.data[1] += v.data[1];
+        self.data[2] += v.data[2];
+    }
+
+    pub fn sub(&mut self, v: Vec3) {
+        self.data[0] -= v.data[0];
+        self.data[1] -= v.data[1];
+        self.data[2] -= v.data[2];
+    }
+
+    pub fn div(&mut self, v: f64) {
+        self.data[0] /= v;
+        self.data[1] /= v;
+        self.data[2] /= v;
+    }
+
+    pub fn mul(&mut self, v: f64) {
+        self.data[0] *= v;
+        self.data[1] *= v;
+        self.data[2] *= v;
+    }
+
+    pub fn reflect(&mut self, mut v: Vec3) {
+        let double_dot = 2.0 * self.dot(&v);
+        v.mul(double_dot);
+        self.sub(v);
+    }
+
+    pub fn unit_vector(mut self) -> Vec3 {
+        let len = self.length();
+        self.data[0] /= len;
+        self.data[1] /= len;
+        self.data[2] /= len;
+        self
+    }
+
     pub fn length(&self) -> f64 {
         f64::sqrt(self.length_squared())
     }
@@ -40,10 +78,6 @@ impl Vec3 {
 
     pub fn cross(&self, v: &Vec3) -> Vec3 {
         cross(self, v)
-    }
-
-    pub fn unit_vector(&self) -> Vec3 {
-        unit_vector(self)
     }
 
     pub fn as_color(&self) -> u32 {
@@ -83,31 +117,6 @@ impl Vec3 {
     }
 }
 
-pub fn reflect(v1: &Vec3, v2: &Vec3) -> Vec3 {
-    v1 - 2.0 * v1.dot(v2) * v2
-}
-
-pub fn random_in_unit_sphere() -> Vec3 {
-    let mut v = Vec3::random_range(-1.0, 1.0);
-    while v.length_squared() >= 1.0 {
-        v = Vec3::random_range(-1.0, 1.0);
-    }
-    v
-}
-
-pub fn random_in_hemisphere(normal: &Vec3) -> Vec3 {
-    let unit_sphere = random_in_unit_sphere();
-    if unit_sphere.dot(normal) > 0.0 {
-        unit_sphere
-    } else {
-        -unit_sphere
-    }
-}
-
-pub fn random_unit_vector() -> Vec3 {
-    random_in_unit_sphere().unit_vector()
-}
-
 pub fn dot(v1: &Vec3, v2: &Vec3) -> f64 {
     v1.data[0] * v2.data[0] + v1.data[1] * v2.data[1] + v1.data[2] * v2.data[2]
 }
@@ -120,6 +129,7 @@ pub fn cross(v1: &Vec3, v2: &Vec3) -> Vec3 {
     )
 }
 
+#[allow(dead_code)]
 pub fn unit_vector(v: &Vec3) -> Vec3 {
     v / v.length()
 }
@@ -289,6 +299,32 @@ impl std::fmt::Debug for Vec3 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Vec3").field("data", &self.data).finish()
     }
+}
+
+pub fn reflect(v1: &Vec3, v2: &Vec3) -> Vec3 {
+    v1 - 2.0 * v1.dot(v2) * v2
+}
+
+pub fn random_in_unit_sphere() -> Vec3 {
+    let mut v = Vec3::random_range(-1.0, 1.0);
+    while v.length_squared() >= 1.0 {
+        v = Vec3::random_range(-1.0, 1.0);
+    }
+    v
+}
+
+#[allow(dead_code)]
+pub fn random_in_hemisphere(normal: &Vec3) -> Vec3 {
+    let unit_sphere = random_in_unit_sphere();
+    if unit_sphere.dot(normal) > 0.0 {
+        unit_sphere
+    } else {
+        -unit_sphere
+    }
+}
+
+pub fn random_unit_vector() -> Vec3 {
+    random_in_unit_sphere().unit_vector()
 }
 
 #[cfg(test)]

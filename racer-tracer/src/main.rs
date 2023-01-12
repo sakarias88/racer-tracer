@@ -22,16 +22,8 @@ use rayon::prelude::*;
 use vec3::Color;
 
 use crate::{
-    camera::Camera,
-    error::TracerError,
-    geometry::sphere::Sphere,
-    geometry::Hittable,
-    image::Image,
-    ray::Ray,
-    scene::Scene,
-    util::random_double,
-    vec3::Vec3,
-    vec3::{random_in_hemisphere, random_unit_vector},
+    camera::Camera, error::TracerError, geometry::sphere::Sphere, geometry::Hittable, image::Image,
+    ray::Ray, scene::Scene, util::random_double, vec3::Vec3,
 };
 
 fn ray_color(scene: &dyn Hittable, ray: &Ray, depth: usize) -> Vec3 {
@@ -93,7 +85,7 @@ fn raytrace(
         for _ in 0..image.samples_per_pixel {
             let u: f64 = (i as f64 + random_double()) / (image.width - 1) as f64;
             let v: f64 = (row as f64 + random_double()) / (image.height - 1) as f64;
-            colors[i] += ray_color(scene, &camera.get_ray(u, v), max_depth);
+            colors[i].add(ray_color(scene, &camera.get_ray(u, v), max_depth));
         }
 
         // Update the screen buffer every now and again.
@@ -130,10 +122,10 @@ fn render(
     buffer: Arc<RwLock<Vec<u32>>>,
     camera: Arc<Camera>,
     image: Arc<Image>,
-    scene: Box<dyn Hittable + std::marker::Sync>,
+    scene: Box<dyn Hittable>,
     max_depth: usize,
 ) {
-    let scene: &(dyn Hittable + Sync) = scene.borrow();
+    let scene: &(dyn Hittable) = scene.borrow();
     let v: Vec<Data> = (0..image.height)
         .map(|row| {
             (
@@ -150,7 +142,7 @@ fn render(
     });
 }
 
-type SharedMaterial = Arc<Box<dyn Material + Send + Sync>>;
+type SharedMaterial = Arc<Box<dyn Material>>;
 fn create_scene() -> Scene {
     let mut scene = Scene::new();
     let material_ground: SharedMaterial =
@@ -183,20 +175,6 @@ fn create_scene() -> Scene {
         Arc::clone(&material_right),
     )));
     scene
-    // Materials
-    /*    let red: Arc<Box<dyn Material + Send + Sync>> =
-        Arc::new(Box::new(Lambertian::new(Color::new(1.0, 0.0, 0.0))));
-    let green: Arc<Box<dyn Material + Send + Sync>> =
-        Arc::new(Box::new(Lambertian::new(Color::new(0.0, 1.0, 0.0))));
-    let metal_red: Arc<Box<dyn Material + Send + Sync>> =
-        Arc::new(Box::new(Metal::new(Color::new(1.0, 0.0, 0.0))));
-
-    // Geometry
-    let sphere1 = Sphere::new(Vec3::new(0.0, 0.0, -1.0), 0.5, Arc::clone(&metal_red));
-    let sphere2 = Sphere::new(Vec3::new(0.0, -100.5, -1.0), 100.0, Arc::clone(&green));
-    scene.add(Box::new(sphere1));
-    scene.add(Box::new(sphere2));
-    scene*/
 }
 
 fn run(
@@ -207,7 +185,7 @@ fn run(
 ) -> Result<(), TracerError> {
     let image = Arc::new(image::Image::new(aspect_ratio, screen_width, samples));
     let camera = Arc::new(camera::Camera::new(&image, 2.0, 1.0));
-    let scene: Box<dyn Hittable + Sync + Send> = Box::new(create_scene());
+    let scene: Box<dyn Hittable> = Box::new(create_scene());
     let screen_buffer: Arc<RwLock<Vec<u32>>> =
         Arc::new(RwLock::new(vec![0; image.width * image.height]));
 
@@ -215,13 +193,19 @@ fn run(
 
     rayon::scope(|s| {
         s.spawn(|_| {
+            let render_time = Instant::now();
             render(
                 Arc::clone(&screen_buffer),
                 camera,
                 Arc::clone(&image),
                 scene,
                 max_depth,
-            )
+            );
+
+            println!(
+                "It took {} seconds to render the image.",
+                Instant::now().duration_since(render_time).as_secs()
+            );
         });
         s.spawn(|_| {
             let result = Window::new(

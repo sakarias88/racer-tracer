@@ -1,7 +1,7 @@
 use crate::geometry::Hittable;
 
 pub struct Scene {
-    objects: Vec<Box<dyn Hittable + Sync + Send>>,
+    objects: Vec<Box<dyn Hittable>>,
 }
 
 impl Scene {
@@ -11,7 +11,7 @@ impl Scene {
         }
     }
 
-    pub fn add(&mut self, hittable: Box<dyn Hittable + Sync + Send>) {
+    pub fn add(&mut self, hittable: Box<dyn Hittable>) {
         self.objects.push(hittable);
     }
 }

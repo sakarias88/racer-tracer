@@ -9,11 +9,11 @@ use crate::vec3::Vec3;
 pub struct Sphere {
     pos: Vec3,
     radius: f64,
-    material: Arc<Box<dyn Material + Sync + Send>>, // Just a color for now.
+    material: Arc<Box<dyn Material>>,
 }
 
 impl Sphere {
-    pub fn new(pos: Vec3, radius: f64, material: Arc<Box<dyn Material + Sync + Send>>) -> Self {
+    pub fn new(pos: Vec3, radius: f64, material: Arc<Box<dyn Material>>) -> Self {
         Self {
             pos,
             radius,

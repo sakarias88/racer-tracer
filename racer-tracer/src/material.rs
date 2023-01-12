@@ -5,6 +5,6 @@ use crate::geometry::HitRecord;
 use crate::ray::Ray;
 use crate::vec3::Color;
 
-pub trait Material {
+pub trait Material: Send + Sync {
     fn scatter(&self, ray: &Ray, hit_record: &HitRecord) -> Option<(Ray, Color)>;
 }
