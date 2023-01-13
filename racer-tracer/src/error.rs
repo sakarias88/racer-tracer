@@ -10,6 +10,9 @@ pub enum TracerError {
 
     #[error("Failed to update window: {0}")]
     FailedToUpdateWindow(String),
+
+    #[error("Resolution is not power of two.")]
+    ResolutionIsNotPowerOfTwo(),
 }
 
 impl From<TracerError> for i32 {
@@ -21,6 +24,7 @@ impl From<TracerError> for i32 {
             } => exit_code,
             TracerError::FailedToCreateWindow(_) => 2,
             TracerError::FailedToUpdateWindow(_) => 3,
+            TracerError::ResolutionIsNotPowerOfTwo() => 4,
         }
     }
 }

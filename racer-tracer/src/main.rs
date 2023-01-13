@@ -5,12 +5,12 @@ mod geometry;
 mod image;
 mod material;
 mod ray;
+mod render;
 mod scene;
 mod util;
 mod vec3;
 
 use std::{
-    borrow::Borrow,
     sync::{Arc, Mutex, RwLock},
     time::{Duration, Instant},
     vec::Vec,
@@ -18,131 +18,22 @@ use std::{
 
 use material::{lambertian::Lambertian, metal::Metal, Material};
 use minifb::{Key, Window, WindowOptions};
-use rayon::prelude::*;
-use vec3::Color;
+use synchronoise::SignalEvent;
 
 use crate::{
-    camera::Camera, error::TracerError, geometry::sphere::Sphere, geometry::Hittable, image::Image,
-    ray::Ray, scene::Scene, util::random_double, vec3::Vec3,
+    camera::Camera,
+    error::TracerError,
+    geometry::sphere::Sphere,
+    geometry::Hittable,
+    image::SubImage,
+    render::render,
+    scene::Scene,
+    vec3::{Color, Vec3},
 };
 
-fn ray_color(scene: &dyn Hittable, ray: &Ray, depth: usize) -> Vec3 {
-    if depth == 0 {
-        return Vec3::default();
-    }
-
-    if let Some(rec) = scene.hit(ray, 0.001, std::f64::INFINITY) {
-        if let Some((scattered, attenuation)) = rec.material.scatter(ray, &rec) {
-            return attenuation * ray_color(scene, &scattered, depth - 1);
-        }
-        return Color::default();
-        //let target = rec.point + random_in_hemisphere(&rec.normal);
-        //let target = rec.point + rec.normal + random_unit_vector();
-        //return 0.5 * ray_color(scene, &Ray::new(rec.point, target - rec.point), depth - 1);
-        //return hit_record.color;
-        //return 0.5 * (hit_record.normal + Vec3::new(1.0, 1.0, 1.0));
-    }
-
-    // TODO: make sky part of scene.
-    // Sky
-    let unit_direction = ray.direction().unit_vector();
-    let t = 0.5 * (unit_direction.y() + 1.0);
-    (1.0 - t) * Vec3::new(1.0, 1.0, 1.0) + t * Vec3::new(0.5, 0.7, 1.0)
-}
-
-fn flush(
-    row: usize,
-    width: usize,
-    start: usize,
-    count: usize,
-    samples: usize,
-    source: &[Vec3],
-    dest: &RwLock<Vec<u32>>,
-) {
-    let mut buf = dest
-        .write()
-        .expect("Failed to get write guard when flushing data.");
-
-    for i in 0..count {
-        buf[row * width + start + i] = source[start + i].scale_sqrt(samples).as_color();
-    }
-}
-
-fn raytrace(
-    buffer: &RwLock<Vec<u32>>,
-    scene: &dyn Hittable,
-    camera: &Camera,
-    image: &Image,
-    row: usize,
-    max_depth: usize,
-) {
-    let mut now = Instant::now();
-    let flush_delay = Duration::from_millis(50 + ((random_double() * 2000.0) as u64));
-    let mut flush_start: usize = 0;
-    let mut colors: Vec<Vec3> = vec![Vec3::default(); image.width as usize];
-
-    for i in 0..colors.len() {
-        for _ in 0..image.samples_per_pixel {
-            let u: f64 = (i as f64 + random_double()) / (image.width - 1) as f64;
-            let v: f64 = (row as f64 + random_double()) / (image.height - 1) as f64;
-            colors[i].add(ray_color(scene, &camera.get_ray(u, v), max_depth));
-        }
-
-        // Update the screen buffer every now and again.
-        if now.elapsed() > flush_delay {
-            now = Instant::now();
-            flush(
-                row,
-                image.width,
-                flush_start,
-                i - flush_start,
-                image.samples_per_pixel,
-                colors.as_slice(),
-                buffer,
-            );
-            flush_start = i;
-        }
-    }
-
-    // Flush last part of the buffer.
-    flush(
-        row,
-        image.width,
-        flush_start,
-        colors.len() - flush_start,
-        image.samples_per_pixel,
-        colors.as_slice(),
-        buffer,
-    );
-}
-
-type Data = (Arc<RwLock<Vec<u32>>>, Arc<Camera>, Arc<Image>, usize);
-
-fn render(
-    buffer: Arc<RwLock<Vec<u32>>>,
-    camera: Arc<Camera>,
-    image: Arc<Image>,
-    scene: Box<dyn Hittable>,
-    max_depth: usize,
-) {
-    let scene: &(dyn Hittable) = scene.borrow();
-    let v: Vec<Data> = (0..image.height)
-        .map(|row| {
-            (
-                Arc::clone(&buffer),
-                Arc::clone(&camera),
-                Arc::clone(&image),
-                row,
-            )
-        })
-        .collect();
-
-    v.par_iter().for_each(|(buf, camera, image, row)| {
-        raytrace(buf, scene, camera, image, *row, max_depth);
-    });
-}
-
 type SharedMaterial = Arc<Box<dyn Material>>;
+
+// TODO: Read from yml
 fn create_scene() -> Scene {
     let mut scene = Scene::new();
     let material_ground: SharedMaterial =
@@ -182,30 +73,75 @@ fn run(
     screen_width: usize,
     samples: usize,
     max_depth: usize,
+    recurse_depth: usize,
 ) -> Result<(), TracerError> {
-    let image = Arc::new(image::Image::new(aspect_ratio, screen_width, samples));
-    let camera = Arc::new(camera::Camera::new(&image, 2.0, 1.0));
-    let scene: Box<dyn Hittable> = Box::new(create_scene());
+    let image = image::Image::new(aspect_ratio, screen_width, samples);
+    let camera = Arc::new(RwLock::new(Camera::new(&image, 2.0, 1.0)));
+    let scene: Arc<Box<dyn Hittable>> = Arc::new(Box::new(create_scene()));
     let screen_buffer: Arc<RwLock<Vec<u32>>> =
         Arc::new(RwLock::new(vec![0; image.width * image.height]));
 
     let window_res: Arc<Mutex<Result<(), TracerError>>> = Arc::new(Mutex::new(Ok(())));
+    let sub_image: SubImage = (&image).into();
+    let move_camera = Arc::clone(&camera);
+
+    let render_image = Arc::new(SignalEvent::manual(false));
+    let window_render_image = Arc::clone(&render_image);
+
+    let cancel_render = Arc::new(SignalEvent::manual(false));
+    let window_cancel_render = cancel_render.clone();
+
+    let exit = Arc::new(SignalEvent::manual(false));
+    let window_exit = Arc::clone(&exit);
 
     rayon::scope(|s| {
         s.spawn(|_| {
-            let render_time = Instant::now();
-            render(
-                Arc::clone(&screen_buffer),
-                camera,
-                Arc::clone(&image),
-                scene,
-                max_depth,
-            );
+            // TODO: Make configurable
+            let preview_scale = 4;
+            let preview_samples = 2;
+            let preview_max_depth = 4;
+            let preview_recurse_depth = 4;
 
-            println!(
-                "It took {} seconds to render the image.",
-                Instant::now().duration_since(render_time).as_secs()
-            );
+            loop {
+                if exit.wait_timeout(Duration::from_secs(0)) {
+                    return;
+                }
+
+                if render_image.wait_timeout(Duration::from_secs(0)) && render_image.status() {
+                    let render_time = Instant::now();
+                    let cancel_render_event = Arc::clone(&cancel_render);
+                    render(
+                        Arc::clone(&screen_buffer),
+                        Arc::clone(&camera),
+                        &sub_image,
+                        Arc::clone(&scene),
+                        samples,
+                        1,
+                        max_depth,
+                        recurse_depth,
+                        Some(cancel_render_event),
+                    );
+
+                    println!(
+                        "It took {} seconds to render the image.",
+                        Instant::now().duration_since(render_time).as_millis()
+                    );
+                } else {
+                    // Render preview
+                    render(
+                        Arc::clone(&screen_buffer),
+                        Arc::clone(&camera),
+                        &sub_image,
+                        Arc::clone(&scene),
+                        preview_samples,
+                        preview_scale,
+                        preview_max_depth,
+                        // TODO: Could create a function to create the optimal value
+                        preview_recurse_depth, //recursive thread depth
+                        None,
+                    );
+                }
+            }
         });
         s.spawn(|_| {
             let result = Window::new(
@@ -220,9 +156,37 @@ fn run(
                 window
             })
             .and_then(|mut window| {
+                let mut t = Instant::now();
                 while window.is_open() && !window.is_key_down(Key::Escape) {
+                    let dt = t.elapsed().as_micros() as f64 / 1000000.0;
+                    t = Instant::now();
                     // Sleep a bit to not hog the lock on the buffer all the time.
-                    std::thread::sleep(std::time::Duration::from_millis(100));
+                    std::thread::sleep(std::time::Duration::from_millis(10));
+
+                    if window.is_key_released(Key::R) {
+                        if window_render_image.status() {
+                            window_cancel_render.signal();
+                            window_render_image.reset();
+                        } else {
+                            window_render_image.signal();
+                            window_cancel_render.reset();
+                        }
+                    }
+
+                    {
+                        let mut cam = move_camera.write().expect("TODO");
+                        if window.is_key_down(Key::W) {
+                            cam.go_forward(-dt);
+                        } else if window.is_key_down(Key::S) {
+                            cam.go_forward(dt);
+                        }
+
+                        if window.is_key_down(Key::A) {
+                            cam.go_right(-dt);
+                        } else if window.is_key_down(Key::D) {
+                            cam.go_right(dt);
+                        }
+                    }
 
                     screen_buffer
                         .read()
@@ -233,6 +197,7 @@ fn run(
                                 .map_err(|e| TracerError::FailedToUpdateWindow(e.to_string()))
                         })?
                 }
+                window_exit.signal();
                 Ok(())
             });
 
@@ -248,7 +213,11 @@ fn run(
 }
 
 fn main() {
-    if let Err(e) = run(16.0 / 9.0, 1200, 1000, 50) {
+    // TODO: Read configuration and args
+    let samples = 1000; // Samples per pixel
+    let max_depth = 50; // Max ray trace depth
+    let recurse_depth = 4; // How many times the screen with split itself into sub images each time splitting it into 4 new smaller ones.
+    if let Err(e) = run(16.0 / 9.0, 1280, samples, max_depth, recurse_depth) {
         eprintln!("{}", e);
         std::process::exit(e.into())
     }

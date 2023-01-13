@@ -33,9 +33,25 @@ impl Camera {
     }
 
     pub fn get_ray(&self, u: f64, v: f64) -> Ray {
+        let upper_left_corner = self.origin + self.vertical / 2.0
+            - self.horizontal / 2.0
+            - Vec3::new(0.0, 0.0, self.focal_length);
+
         Ray::new(
             self.origin,
-            self.upper_left_corner + u * self.horizontal - v * self.vertical - self.origin,
+            upper_left_corner + u * self.horizontal - v * self.vertical - self.origin,
         )
+    }
+
+    // TODO: Add support for rotation
+
+    // TODO: Use forward facing vector
+    pub fn go_forward(&mut self, go: f64) {
+        self.origin += Vec3::new(0.0, 0.0, go);
+    }
+
+    // TODO: Use right facing vector
+    pub fn go_right(&mut self, go: f64) {
+        self.origin += Vec3::new(go, 0.0, 0.0);
     }
 }
