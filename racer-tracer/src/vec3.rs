@@ -146,6 +146,18 @@ impl ops::Add<Vec3> for Vec3 {
     }
 }
 
+impl ops::Add<Vec3> for &Vec3 {
+    type Output = Vec3;
+
+    fn add(self, rhs: Vec3) -> Self::Output {
+        Vec3::new(
+            self.data[0] + rhs.data[0],
+            self.data[1] + rhs.data[1],
+            self.data[2] + rhs.data[2],
+        )
+    }
+}
+
 impl ops::AddAssign<Vec3> for Vec3 {
     fn add_assign(&mut self, rhs: Vec3) {
         self.data[0] += rhs.data[0];
@@ -275,6 +287,14 @@ impl ops::Neg for Vec3 {
     }
 }
 
+impl ops::Neg for &Vec3 {
+    type Output = Vec3;
+
+    fn neg(self) -> Self::Output {
+        Vec3::new(-self.data[0], -self.data[1], -self.data[2])
+    }
+}
+
 impl PartialEq for Vec3 {
     fn eq(&self, other: &Self) -> bool {
         self.data[0] == other.data[0]
@@ -303,6 +323,14 @@ impl std::fmt::Debug for Vec3 {
 
 pub fn reflect(v1: &Vec3, v2: &Vec3) -> Vec3 {
     v1 - 2.0 * v1.dot(v2) * v2
+}
+
+pub fn refract(uv: &Vec3, n: &Vec3, etai_over_etat: f64) -> Vec3 {
+    let cos_theta = f64::min(dot(&-uv, n), 1.0);
+
+    let r_out_perp = etai_over_etat * (uv + (cos_theta * n));
+    let r_out_parallel = -f64::sqrt(f64::abs(1.0 - r_out_perp.length_squared())) * n;
+    r_out_perp + r_out_parallel
 }
 
 pub fn random_in_unit_sphere() -> Vec3 {

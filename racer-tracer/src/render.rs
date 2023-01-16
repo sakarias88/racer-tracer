@@ -50,6 +50,10 @@ pub fn raytrace(
     scale: usize,
     max_depth: usize,
 ) {
+    // TODO: This scale shit doesn't work.
+    // Just force power of two or other solutions to avoid this.
+    // Can be ok for preview but the actual render could use a different function.
+
     let mut scaled_width = image.width / scale;
     let mut scaled_height = image.height / scale;
     // In the case where we get an odd one out we patch the widht and
@@ -66,7 +70,7 @@ pub fn raytrace(
         scaled_width += 1;
     }
 
-    if scaled_width * scale != image.height
+    if scaled_height * scale != image.height
         && (image.y + scaled_height * scale + 1 < image.screen_height)
     {
         scaled_height += 1;

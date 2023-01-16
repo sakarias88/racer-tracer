@@ -16,7 +16,7 @@ use std::{
     vec::Vec,
 };
 
-use material::{lambertian::Lambertian, metal::Metal, Material};
+use material::{dialectric::Dialectric, lambertian::Lambertian, metal::Metal, Material};
 use minifb::{Key, Window, WindowOptions};
 use synchronoise::SignalEvent;
 
@@ -39,11 +39,11 @@ fn create_scene() -> Scene {
     let material_ground: SharedMaterial =
         Arc::new(Box::new(Lambertian::new(Color::new(0.8, 0.8, 0.0))));
     let material_center: SharedMaterial =
-        Arc::new(Box::new(Lambertian::new(Color::new(0.7, 0.3, 0.3))));
-    let material_left: SharedMaterial =
-        Arc::new(Box::new(Metal::new(Color::new(0.8, 0.8, 0.8), 0.3)));
+        Arc::new(Box::new(Lambertian::new(Color::new(0.1, 0.2, 0.5))));
+    let material_left: SharedMaterial = Arc::new(Box::new(Dialectric::new(1.5)));
+
     let material_right: SharedMaterial =
-        Arc::new(Box::new(Metal::new(Color::new(0.8, 0.6, 0.2), 0.1)));
+        Arc::new(Box::new(Metal::new(Color::new(0.8, 0.6, 0.2), 0.0)));
 
     scene.add(Box::new(Sphere::new(
         Vec3::new(0.0, -100.5, -1.0),
@@ -60,6 +60,13 @@ fn create_scene() -> Scene {
         0.5,
         Arc::clone(&material_left),
     )));
+
+    scene.add(Box::new(Sphere::new(
+        Vec3::new(-1.0, 0.0, -1.0),
+        -0.4,
+        Arc::clone(&material_left),
+    )));
+
     scene.add(Box::new(Sphere::new(
         Vec3::new(1.0, 0.0, -1.0),
         0.5,
