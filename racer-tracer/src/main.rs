@@ -1,6 +1,7 @@
 #[macro_use]
 mod error;
 mod camera;
+mod config;
 mod geometry;
 mod image;
 mod material;
@@ -22,6 +23,7 @@ use synchronoise::SignalEvent;
 
 use crate::{
     camera::Camera,
+    config::{Args, Config},
     error::TracerError,
     geometry::sphere::Sphere,
     geometry::Hittable,
@@ -75,14 +77,11 @@ fn create_scene() -> Scene {
     scene
 }
 
-fn run(
-    aspect_ratio: f64,
-    screen_width: usize,
-    samples: usize,
-    max_depth: usize,
-    recurse_depth: usize,
-) -> Result<(), TracerError> {
-    let image = image::Image::new(aspect_ratio, screen_width, samples);
+fn run(config: Config) -> Result<(), TracerError> {
+    let preview_render_data = Arc::new(config.preview);
+    let recurse_depth = 4;
+    let render_data = Arc::new(config.render);
+    let image = image::Image::new(config.screen.width, config.screen.height);
     let camera = Arc::new(RwLock::new(Camera::new(&image, 2.0, 1.0)));
     let scene: Arc<Box<dyn Hittable>> = Arc::new(Box::new(create_scene()));
     let screen_buffer: Arc<RwLock<Vec<u32>>> =
@@ -103,12 +102,6 @@ fn run(
 
     rayon::scope(|s| {
         s.spawn(|_| {
-            // TODO: Make configurable
-            let preview_scale = 4;
-            let preview_samples = 2;
-            let preview_max_depth = 4;
-            let preview_recurse_depth = 4;
-
             loop {
                 if exit.wait_timeout(Duration::from_secs(0)) {
                     return;
@@ -122,9 +115,7 @@ fn run(
                         Arc::clone(&camera),
                         &sub_image,
                         Arc::clone(&scene),
-                        samples,
-                        1,
-                        max_depth,
+                        Arc::clone(&render_data),
                         recurse_depth,
                         Some(cancel_render_event),
                     );
@@ -140,11 +131,8 @@ fn run(
                         Arc::clone(&camera),
                         &sub_image,
                         Arc::clone(&scene),
-                        preview_samples,
-                        preview_scale,
-                        preview_max_depth,
-                        // TODO: Could create a function to create the optimal value
-                        preview_recurse_depth, //recursive thread depth
+                        Arc::clone(&preview_render_data),
+                        recurse_depth,
                         None,
                     );
                 }
@@ -218,13 +206,11 @@ fn run(
     let res = (window_res.lock().expect("Failed to get result lock.")).clone();
     res
 }
-
+use structopt::StructOpt;
 fn main() {
-    // TODO: Read configuration and args
-    let samples = 1000; // Samples per pixel
-    let max_depth = 50; // Max ray trace depth
-    let recurse_depth = 4; // How many times the screen with split itself into sub images each time splitting it into 4 new smaller ones.
-    if let Err(e) = run(16.0 / 9.0, 1280, samples, max_depth, recurse_depth) {
+    let args = Args::from_args();
+
+    if let Err(e) = Config::from_file(args.config).and_then(run) {
         eprintln!("{}", e);
         std::process::exit(e.into())
     }

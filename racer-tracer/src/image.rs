@@ -2,16 +2,14 @@ pub struct Image {
     pub aspect_ratio: f64,
     pub width: usize,
     pub height: usize,
-    pub samples_per_pixel: usize,
 }
 
 impl Image {
-    pub fn new(aspect_ratio: f64, width: usize, samples_per_pixel: usize) -> Image {
+    pub fn new(width: usize, height: usize) -> Image {
         Image {
-            aspect_ratio,
+            aspect_ratio: width as f64 / height as f64,
             width,
-            height: (width as f64 / aspect_ratio) as usize,
-            samples_per_pixel,
+            height,
         }
     }
 }
@@ -24,7 +22,6 @@ impl From<&Image> for SubImage {
             y: 0,
             width: image.width,
             height: image.height,
-            samples: image.samples_per_pixel,
             screen_width: image.width,
             screen_height: image.height,
         }
@@ -38,7 +35,6 @@ pub struct SubImage {
     pub screen_height: usize,
     pub width: usize,
     pub height: usize,
-    pub samples: usize,
 }
 
 pub trait QuadSplit {
@@ -57,7 +53,6 @@ impl QuadSplit for SubImage {
                 y: self.y,
                 width: half_w,
                 height: half_h,
-                samples: self.samples,
                 screen_width: self.screen_width,
                 screen_height: self.screen_height,
             },
@@ -67,7 +62,6 @@ impl QuadSplit for SubImage {
                 y: self.y,
                 width: half_w,
                 height: half_h,
-                samples: self.samples,
                 screen_width: self.screen_width,
                 screen_height: self.screen_height,
             },
@@ -77,7 +71,6 @@ impl QuadSplit for SubImage {
                 y: self.y + half_h,
                 width: half_w,
                 height: half_h,
-                samples: self.samples,
                 screen_width: self.screen_width,
                 screen_height: self.screen_height,
             },
@@ -87,7 +80,6 @@ impl QuadSplit for SubImage {
                 y: self.y + half_h,
                 width: half_w,
                 height: half_h,
-                samples: self.samples,
                 screen_width: self.screen_width,
                 screen_height: self.screen_height,
             },

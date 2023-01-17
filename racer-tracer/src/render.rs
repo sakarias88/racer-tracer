@@ -9,6 +9,7 @@ use synchronoise::SignalEvent;
 
 use crate::{
     camera::Camera,
+    config::RenderData,
     geometry::Hittable,
     image::{QuadSplit, SubImage},
     ray::Ray,
@@ -26,18 +27,14 @@ fn ray_color(scene: &dyn Hittable, ray: &Ray, depth: usize) -> Vec3 {
             return attenuation * ray_color(scene, &scattered, depth - 1);
         }
         return Color::default();
-        //let target = rec.point + random_in_hemisphere(&rec.normal);
-        //let target = rec.point + rec.normal + random_unit_vector();
-        //return 0.5 * ray_color(scene, &Ray::new(rec.point, target - rec.point), depth - 1);
-        //return hit_record.color;
-        //return 0.5 * (hit_record.normal + Vec3::new(1.0, 1.0, 1.0));
     }
 
-    // TODO: make sky part of scene.
     // Sky
+    let first_color = Vec3::new(1.0, 1.0, 1.0);
+    let second_color = Vec3::new(0.5, 0.7, 1.0);
     let unit_direction = ray.direction().unit_vector();
     let t = 0.5 * (unit_direction.y() + 1.0);
-    (1.0 - t) * Vec3::new(1.0, 1.0, 1.0) + t * Vec3::new(0.5, 0.7, 1.0)
+    (1.0 - t) * first_color + t * second_color
 }
 
 pub fn raytrace(
@@ -46,16 +43,14 @@ pub fn raytrace(
     scene: &dyn Hittable,
     camera: &Camera,
     image: &SubImage,
-    samples: usize,
-    scale: usize,
-    max_depth: usize,
+    data: &RenderData,
 ) {
     // TODO: This scale shit doesn't work.
     // Just force power of two or other solutions to avoid this.
     // Can be ok for preview but the actual render could use a different function.
 
-    let mut scaled_width = image.width / scale;
-    let mut scaled_height = image.height / scale;
+    let mut scaled_width = image.width / data.scale;
+    let mut scaled_height = image.height / data.scale;
     // In the case where we get an odd one out we patch the widht and
     // height with the esception of the edges of the screen.  Without
     // this everything has to be power of 2 which isn't a crazy
@@ -64,32 +59,32 @@ pub fn raytrace(
     // Biggest problem is that the width and height we get here is
     // depending on resolution and how many times the image is split
     // up between threads.
-    if scaled_width * scale != image.width
-        && (image.x + scaled_width * scale + 1 < image.screen_width)
+    if scaled_width * data.scale != image.width
+        && (image.x + scaled_width * data.scale + 1 < image.screen_width)
     {
         scaled_width += 1;
     }
 
-    if scaled_height * scale != image.height
-        && (image.y + scaled_height * scale + 1 < image.screen_height)
+    if scaled_height * data.scale != image.height
+        && (image.y + scaled_height * data.scale + 1 < image.screen_height)
     {
         scaled_height += 1;
     }
 
-    let scaled_screen_width = image.screen_width / scale;
-    let scaled_screen_height = image.screen_height / scale;
+    let scaled_screen_width = image.screen_width / data.scale;
+    let scaled_screen_height = image.screen_height / data.scale;
     let mut colors: Vec<Vec3> = vec![Vec3::default(); scaled_height * scaled_width as usize];
     for row in 0..scaled_height {
         for column in 0..scaled_width {
-            let u: f64 = ((image.x / scale + column) as f64 + random_double())
+            let u: f64 = ((image.x / data.scale + column) as f64 + random_double())
                 / (scaled_screen_width - 1) as f64;
-            for _ in 0..samples {
-                let v: f64 = ((image.y / scale + row) as f64 + random_double())
+            for _ in 0..data.samples {
+                let v: f64 = ((image.y / data.scale + row) as f64 + random_double())
                     / (scaled_screen_height - 1) as f64;
                 colors[row * scaled_width + column].add(ray_color(
                     scene,
                     &camera.get_ray(u, v),
-                    max_depth,
+                    data.max_depth,
                 ));
             }
         }
@@ -111,14 +106,14 @@ pub fn raytrace(
     for half_row in 0..scaled_height {
         for half_col in 0..scaled_width {
             let color = colors[half_row * scaled_width + half_col]
-                .scale_sqrt(samples)
+                .scale_sqrt(data.samples)
                 .as_color();
 
-            let row = half_row * scale;
-            let col = half_col * scale;
+            let row = half_row * data.scale;
+            let col = half_col * data.scale;
 
-            for scale_x in 0..scale {
-                for scale_y in 0..scale {
+            for scale_x in 0..data.scale {
+                for scale_y in 0..data.scale {
                     buf[offset + (row + scale_x) * image.screen_width + col + scale_y] = color;
                 }
             }
@@ -138,9 +133,7 @@ pub fn render(
     camera: Arc<RwLock<Camera>>,
     image: &SubImage,
     scene: Arc<Box<dyn Hittable>>,
-    samples: usize,
-    scale: usize,
-    max_depth: usize,
+    data: Arc<RenderData>,
     split_depth: usize,
     cancel_event: Option<Arc<SignalEvent>>,
 ) {
@@ -151,16 +144,7 @@ pub fn render(
     if split_depth == 0 {
         let scene: &(dyn Hittable) = (*scene).borrow();
         let camera = { camera.read().expect("TODO").clone() };
-        raytrace(
-            &buffer,
-            cancel_event,
-            scene,
-            &camera,
-            image,
-            samples,
-            scale,
-            max_depth,
-        );
+        raytrace(&buffer, cancel_event, scene, &camera, image, &data);
     } else {
         // Split into more quads
         let quads = image.quad_split();
@@ -170,9 +154,7 @@ pub fn render(
                 Arc::clone(&camera),
                 &image,
                 Arc::clone(&scene),
-                samples,
-                scale,
-                max_depth,
+                Arc::clone(&data),
                 split_depth - 1,
                 cancel_event.clone(),
             );

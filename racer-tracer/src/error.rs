@@ -13,6 +13,9 @@ pub enum TracerError {
 
     #[error("Resolution is not power of two.")]
     ResolutionIsNotPowerOfTwo(),
+
+    #[error("Config Error ({0}): {1}")]
+    Configuration(String, String),
 }
 
 impl From<TracerError> for i32 {
@@ -25,6 +28,7 @@ impl From<TracerError> for i32 {
             TracerError::FailedToCreateWindow(_) => 2,
             TracerError::FailedToUpdateWindow(_) => 3,
             TracerError::ResolutionIsNotPowerOfTwo() => 4,
+            TracerError::Configuration(_, _) => 5,
         }
     }
 }

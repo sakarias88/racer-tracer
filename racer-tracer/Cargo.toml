@@ -13,3 +13,5 @@ rayon = "1.6.1"
 structopt = "0.3"
 num_cpus = "1.15.0"
 synchronoise = "1.0.1"
+config = "0.13.3"
+serde = { version = "1", features = ["derive"] }

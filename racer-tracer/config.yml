@@ -1,0 +1,16 @@
+preview:
+  samples: 2
+  max_depth: 4
+  recurse_depth: 4
+  scale: 4
+
+render:
+  samples: 1000
+  max_depth: 40
+  recurse_depth: 4
+  scale: 1
+
+screen:
+  width: 1280
+  height: 720
+
