@@ -16,6 +16,12 @@ pub enum TracerError {
 
     #[error("Config Error ({0}): {1}")]
     Configuration(String, String),
+
+    #[error("Unknown Material {0}.")]
+    UnknownMaterial(String),
+
+    #[error("No scene supplied.")]
+    NoScene(),
 }
 
 impl From<TracerError> for i32 {
@@ -29,6 +35,8 @@ impl From<TracerError> for i32 {
             TracerError::FailedToUpdateWindow(_) => 3,
             TracerError::ResolutionIsNotPowerOfTwo() => 4,
             TracerError::Configuration(_, _) => 5,
+            TracerError::UnknownMaterial(_) => 6,
+            TracerError::NoScene() => 7,
         }
     }
 }

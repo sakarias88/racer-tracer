@@ -12,12 +12,12 @@ mod util;
 mod vec3;
 
 use std::{
+    convert::TryFrom,
     sync::{Arc, Mutex, RwLock},
     time::{Duration, Instant},
     vec::Vec,
 };
 
-use material::{dialectric::Dialectric, lambertian::Lambertian, metal::Metal, Material};
 use minifb::{Key, Window, WindowOptions};
 use synchronoise::SignalEvent;
 
@@ -25,65 +25,23 @@ use crate::{
     camera::Camera,
     config::{Args, Config},
     error::TracerError,
-    geometry::sphere::Sphere,
     geometry::Hittable,
     image::SubImage,
     render::render,
     scene::Scene,
-    vec3::{Color, Vec3},
 };
-
-type SharedMaterial = Arc<Box<dyn Material>>;
-
-// TODO: Read from yml
-fn create_scene() -> Scene {
-    let mut scene = Scene::new();
-    let material_ground: SharedMaterial =
-        Arc::new(Box::new(Lambertian::new(Color::new(0.8, 0.8, 0.0))));
-    let material_center: SharedMaterial =
-        Arc::new(Box::new(Lambertian::new(Color::new(0.1, 0.2, 0.5))));
-    let material_left: SharedMaterial = Arc::new(Box::new(Dialectric::new(1.5)));
-
-    let material_right: SharedMaterial =
-        Arc::new(Box::new(Metal::new(Color::new(0.8, 0.6, 0.2), 0.0)));
-
-    scene.add(Box::new(Sphere::new(
-        Vec3::new(0.0, -100.5, -1.0),
-        100.0,
-        Arc::clone(&material_ground),
-    )));
-    scene.add(Box::new(Sphere::new(
-        Vec3::new(0.0, 0.0, -1.0),
-        0.5,
-        Arc::clone(&material_center),
-    )));
-    scene.add(Box::new(Sphere::new(
-        Vec3::new(-1.0, 0.0, -1.0),
-        0.5,
-        Arc::clone(&material_left),
-    )));
-
-    scene.add(Box::new(Sphere::new(
-        Vec3::new(-1.0, 0.0, -1.0),
-        -0.4,
-        Arc::clone(&material_left),
-    )));
-
-    scene.add(Box::new(Sphere::new(
-        Vec3::new(1.0, 0.0, -1.0),
-        0.5,
-        Arc::clone(&material_right),
-    )));
-    scene
-}
 
 fn run(config: Config) -> Result<(), TracerError> {
     let preview_render_data = Arc::new(config.preview);
-    let recurse_depth = 4;
     let render_data = Arc::new(config.render);
     let image = image::Image::new(config.screen.width, config.screen.height);
     let camera = Arc::new(RwLock::new(Camera::new(&image, 2.0, 1.0)));
-    let scene: Arc<Box<dyn Hittable>> = Arc::new(Box::new(create_scene()));
+    let scene: Arc<Box<dyn Hittable>> = Arc::new(Box::new(
+        config
+            .scene
+            .ok_or(TracerError::NoScene())
+            .and_then(Scene::from_file)?,
+    ));
     let screen_buffer: Arc<RwLock<Vec<u32>>> =
         Arc::new(RwLock::new(vec![0; image.width * image.height]));
 
@@ -116,7 +74,7 @@ fn run(config: Config) -> Result<(), TracerError> {
                         &sub_image,
                         Arc::clone(&scene),
                         Arc::clone(&render_data),
-                        recurse_depth,
+                        render_data.recurse_depth,
                         Some(cancel_render_event),
                     );
 
@@ -132,7 +90,7 @@ fn run(config: Config) -> Result<(), TracerError> {
                         &sub_image,
                         Arc::clone(&scene),
                         Arc::clone(&preview_render_data),
-                        recurse_depth,
+                        preview_render_data.recurse_depth,
                         None,
                     );
                 }
@@ -208,9 +166,7 @@ fn run(config: Config) -> Result<(), TracerError> {
 }
 use structopt::StructOpt;
 fn main() {
-    let args = Args::from_args();
-
-    if let Err(e) = Config::from_file(args.config).and_then(run) {
+    if let Err(e) = Config::try_from(Args::from_args()).and_then(run) {
         eprintln!("{}", e);
         std::process::exit(e.into())
     }

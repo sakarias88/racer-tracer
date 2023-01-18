@@ -1,0 +1,53 @@
+---
+materials:
+  grass:
+    Lambertian:
+      color:
+        data: [ 0.8, 0.8, 0.0 ]
+
+  center:
+    Lambertian:
+      color:
+        data: [ 0.1, 0.2, 0.5 ]
+
+  left:
+    Dialectric:
+      refraction_index: 1.5
+
+  right:
+    Metal:
+      color:
+        data: [ 0.8, 0.6, 0.2]
+      fuzz: 0.0
+
+geometry:
+  - Sphere:
+      pos:
+        data: [ 0.0, -100.5, -1.0 ]
+      radius: 100.0
+      material: grass
+
+  - Sphere:
+      pos:
+        data: [ 0.0, 0.0, -1.0 ]
+      radius: 0.5
+      material: center
+
+  - Sphere:
+      pos:
+        data: [ -1.0, 0.0, -1.0 ]
+      radius: 0.5
+      material: left
+
+  - Sphere:
+      pos:
+        data: [ -1.0, 0.0, -1.0 ]
+      radius: -0.4
+      material: left
+
+  - Sphere:
+      pos:
+        data: [ 1.0, 0.0, -1.0 ]
+      radius: -0.5
+      material: right
+

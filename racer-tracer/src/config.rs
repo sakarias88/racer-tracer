@@ -28,6 +28,21 @@ pub struct Args {
         env = "CONFIG"
     )]
     pub config: String,
+
+    #[structopt(short = "s", long = "scene")]
+    pub scene: Option<String>,
+}
+
+impl TryFrom<Args> for Config {
+    type Error = TracerError;
+    fn try_from(args: Args) -> Result<Self, TracerError> {
+        Config::from_file(args.config).map(|mut cfg| {
+            if args.scene.is_some() {
+                cfg.scene = args.scene;
+            }
+            cfg
+        })
+    }
 }
 
 #[derive(Default, Debug, Deserialize)]
@@ -40,6 +55,9 @@ pub struct Config {
 
     #[serde(default)]
     pub screen: Screen,
+
+    #[serde(default)]
+    pub scene: Option<String>,
 }
 
 impl Config {

@@ -1,8 +1,11 @@
 use std::{fmt, ops};
 
+use serde::Deserialize;
+
 use crate::util::{random_double, random_double_range};
 
-#[derive(Default, Clone, Copy)]
+// TODO: Remove clone and copy. We want to be aware when this happens to save time.
+#[derive(Default, Clone, Copy, Deserialize)]
 pub struct Vec3 {
     data: [f64; 3],
 }
