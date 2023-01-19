@@ -1,0 +1,41 @@
+name: Cargo Build & Test
+
+on:
+  push:
+  pull_request:
+
+
+env: 
+  CARGO_TERM_COLOR: always
+
+
+jobs:
+  name: Rust project - latest
+  runs-on: ubuntu-latest
+  
+  steps:
+    - uses: actions/checkout@v3
+
+    - name: Install toolchain
+      run: |
+        rustup update stable
+        rustup default stable
+        rustup component add clippy
+
+    - name: Lint
+      run: |
+        cd racer-tracer
+        cargo fmt -- --check
+        cargo clippy -- -D warnings
+
+    - name: Test
+      run: |
+        cd racer-tracer
+        cargo check
+        cargo test --all
+
+    - name: Build
+      run: |
+        cd racer-tracer
+        cargo build --release
+
