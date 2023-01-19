@@ -73,7 +73,7 @@ pub fn raytrace(
 
     let scaled_screen_width = image.screen_width / data.scale;
     let scaled_screen_height = image.screen_height / data.scale;
-    let mut colors: Vec<Vec3> = vec![Vec3::default(); scaled_height * scaled_width as usize];
+    let mut colors: Vec<Vec3> = vec![Vec3::default(); scaled_height * scaled_width];
     for row in 0..scaled_height {
         for column in 0..scaled_width {
             let u: f64 = ((image.x / data.scale + column) as f64 + random_double())

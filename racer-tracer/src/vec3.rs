@@ -87,7 +87,7 @@ impl Vec3 {
         let red: u32 = (self.data[0] * 255.0) as u32;
         let green: u32 = (self.data[1] * 255.0) as u32;
         let blue: u32 = (self.data[2] * 255.0) as u32;
-        ((red as u32) << 16) | ((green as u32) << 8) | blue as u32
+        (red << 16) | green << 8 | blue
     }
 
     pub fn random() -> Self {

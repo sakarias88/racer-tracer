@@ -15,12 +15,14 @@ pub struct Scene {
 }
 
 impl Scene {
+    #[allow(dead_code)]
     pub fn new() -> Self {
         Self {
             objects: Vec::new(),
         }
     }
 
+    #[allow(dead_code)]
     pub fn add(&mut self, hittable: Box<dyn Hittable>) {
         self.objects.push(hittable);
     }
