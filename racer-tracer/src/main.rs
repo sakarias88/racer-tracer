@@ -13,7 +13,7 @@ mod vec3;
 
 use std::{
     convert::TryFrom,
-    sync::{Arc, Mutex, RwLock},
+    sync::RwLock,
     time::{Duration, Instant},
     vec::Vec,
 };
@@ -25,38 +25,27 @@ use crate::{
     camera::Camera,
     config::{Args, Config},
     error::TracerError,
-    geometry::Hittable,
-    image::SubImage,
     render::render,
     scene::Scene,
 };
 
 fn run(config: Config) -> Result<(), TracerError> {
-    let preview_render_data = Arc::new(config.preview);
-    let render_data = Arc::new(config.render);
+    let preview_render_data = config.preview;
+    let render_data = config.render;
     let image = image::Image::new(config.screen.width, config.screen.height);
-    let camera = Arc::new(RwLock::new(Camera::new(&image, 2.0, 1.0)));
-    let scene: Arc<Box<dyn Hittable>> = Arc::new(Box::new(
-        config
-            .scene
-            .ok_or(TracerError::NoScene())
-            .and_then(Scene::from_file)?,
-    ));
-    let screen_buffer: Arc<RwLock<Vec<u32>>> =
-        Arc::new(RwLock::new(vec![0; image.width * image.height]));
+    let camera = RwLock::new(Camera::new(&image, 2.0, 1.0));
+    let scene: Scene = config
+        .scene
+        .ok_or(TracerError::NoScene())
+        .and_then(Scene::from_file)?;
+    let screen_buffer: RwLock<Vec<u32>> = RwLock::new(vec![0; image.width * image.height]);
 
-    let window_res: Arc<Mutex<Result<(), TracerError>>> = Arc::new(Mutex::new(Ok(())));
-    let sub_image: SubImage = (&image).into();
-    let move_camera = Arc::clone(&camera);
+    let mut window_res: Result<(), TracerError> = Ok(());
+    let move_camera = &camera;
 
-    let render_image = Arc::new(SignalEvent::manual(false));
-    let window_render_image = Arc::clone(&render_image);
-
-    let cancel_render = Arc::new(SignalEvent::manual(false));
-    let window_cancel_render = cancel_render.clone();
-
-    let exit = Arc::new(SignalEvent::manual(false));
-    let window_exit = Arc::clone(&exit);
+    let render_image = SignalEvent::manual(false);
+    let cancel_render = SignalEvent::manual(false);
+    let exit = SignalEvent::manual(false);
 
     rayon::scope(|s| {
         s.spawn(|_| {
@@ -67,15 +56,14 @@ fn run(config: Config) -> Result<(), TracerError> {
 
                 if render_image.wait_timeout(Duration::from_secs(0)) && render_image.status() {
                     let render_time = Instant::now();
-                    let cancel_render_event = Arc::clone(&cancel_render);
                     render(
-                        Arc::clone(&screen_buffer),
-                        Arc::clone(&camera),
-                        &sub_image,
-                        Arc::clone(&scene),
-                        Arc::clone(&render_data),
-                        render_data.recurse_depth,
-                        Some(cancel_render_event),
+                        &screen_buffer,
+                        &camera,
+                        &image,
+                        &scene,
+                        &render_data,
+                        Some(&cancel_render),
+                        None,
                     );
 
                     println!(
@@ -85,19 +73,19 @@ fn run(config: Config) -> Result<(), TracerError> {
                 } else {
                     // Render preview
                     render(
-                        Arc::clone(&screen_buffer),
-                        Arc::clone(&camera),
-                        &sub_image,
-                        Arc::clone(&scene),
-                        Arc::clone(&preview_render_data),
-                        preview_render_data.recurse_depth,
+                        &screen_buffer,
+                        &camera,
+                        &image,
+                        &scene,
+                        &preview_render_data,
                         None,
+                        Some(preview_render_data.scale),
                     );
                 }
             }
         });
         s.spawn(|_| {
-            let result = Window::new(
+            window_res = Window::new(
                 "racer-tracer",
                 image.width,
                 image.height,
@@ -117,12 +105,12 @@ fn run(config: Config) -> Result<(), TracerError> {
                     std::thread::sleep(std::time::Duration::from_millis(10));
 
                     if window.is_key_released(Key::R) {
-                        if window_render_image.status() {
-                            window_cancel_render.signal();
-                            window_render_image.reset();
+                        if render_image.status() {
+                            cancel_render.signal();
+                            render_image.reset();
                         } else {
-                            window_render_image.signal();
-                            window_cancel_render.reset();
+                            render_image.signal();
+                            cancel_render.reset();
                         }
                     }
 
@@ -150,19 +138,12 @@ fn run(config: Config) -> Result<(), TracerError> {
                                 .map_err(|e| TracerError::FailedToUpdateWindow(e.to_string()))
                         })?
                 }
-                window_exit.signal();
+                exit.signal();
                 Ok(())
             });
-
-            if result.is_err() {
-                let mut a = window_res.lock().expect("Failed to get result lock.");
-                *a = result;
-            }
         });
     });
-
-    let res = (window_res.lock().expect("Failed to get result lock.")).clone();
-    res
+    window_res
 }
 use structopt::StructOpt;
 fn main() {

@@ -1,14 +1,16 @@
 preview:
   samples: 2
   max_depth: 4
-  recurse_depth: 4
-  scale: 4
+  scale: 2
+  num_threads_width: 10
+  num_threads_height: 10
 
 render:
-  samples: 1000
-  max_depth: 40
-  recurse_depth: 4
+  samples: 100
+  max_depth: 20
   scale: 1
+  num_threads_width: 10
+  num_threads_height: 10
 
 screen:
   width: 1280
