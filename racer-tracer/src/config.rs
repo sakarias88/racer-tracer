@@ -14,7 +14,8 @@ pub struct Screen {
 pub struct RenderData {
     pub samples: usize,
     pub max_depth: usize,
-    pub recurse_depth: usize,
+    pub num_threads_width: usize,
+    pub num_threads_height: usize,
     pub scale: usize,
 }
 
