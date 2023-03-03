@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use config::File;
 use serde::Deserialize;
 use structopt::StructOpt;
@@ -59,6 +61,9 @@ pub struct Config {
 
     #[serde(default)]
     pub scene: Option<String>,
+
+    #[serde(default)]
+    pub image_output_dir: Option<PathBuf>,
 }
 
 impl Config {

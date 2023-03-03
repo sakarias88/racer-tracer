@@ -5,6 +5,9 @@ pub enum TracerError {
     #[error("Unknown error: {message}")]
     Unknown { message: String, exit_code: i32 },
 
+    #[error("Error: {0}")]
+    Generic(String),
+
     #[error("Failed to create window: {0}")]
     FailedToCreateWindow(String),
 
@@ -31,6 +34,9 @@ pub enum TracerError {
 
     #[error("Cancel event")]
     CancelEvent,
+
+    #[error("Image save error: {0}")]
+    ImageSave(String),
 }
 
 impl From<TracerError> for i32 {
@@ -49,6 +55,8 @@ impl From<TracerError> for i32 {
             TracerError::FailedToAcquireLock(_) => 8,
             TracerError::ExitEvent => 9,
             TracerError::CancelEvent => 10,
+            TracerError::Generic(_) => 11,
+            TracerError::ImageSave(_) => 12,
         }
     }
 }

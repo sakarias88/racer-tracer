@@ -11,14 +11,18 @@ mod scene;
 mod util;
 mod vec3;
 
+extern crate image as img;
+
 use std::{
     convert::TryFrom,
+    path::PathBuf,
     sync::RwLock,
     time::{Duration, Instant},
     vec::Vec,
 };
 
 use minifb::{Key, Window, WindowOptions};
+use sha2::{Digest, Sha256};
 use synchronoise::SignalEvent;
 
 use crate::{
@@ -70,7 +74,7 @@ fn run(config: Config) -> Result<(), TracerError> {
                                 },
                                 |_| {
                                     let render_time = Instant::now();
-                                    let res = render(
+                                    render(
                                         &screen_buffer,
                                         &camera,
                                         &image,
@@ -78,20 +82,73 @@ fn run(config: Config) -> Result<(), TracerError> {
                                         &config.render,
                                         Some(&cancel_render),
                                         None,
-                                    );
-                                    render_image.reset();
+                                    )
+                                    .and_then(|_| {
+                                        render_image.reset();
 
-                                    println!(
-                                        "It took {} seconds to render the image.",
-                                        Instant::now().duration_since(render_time).as_secs()
-                                    );
+                                        println!(
+                                            "It took {} seconds to render the image.",
+                                            Instant::now().duration_since(render_time).as_secs()
+                                        );
+                                        screen_buffer
+                                            .read()
+                                            .map_err(|e| {
+                                                TracerError::FailedToAcquireLock(e.to_string())
+                                            })
+                                            .map(|buf| {
+                                                // Convert ARGB8 to RGBA8
+                                                buf.iter()
+                                                    .map(|v| {
+                                                        let a: u32 = (v >> 24) & 0xff;
+                                                        let r: u32 = (v >> 16) & 0xff;
+                                                        let g: u32 = (v >> 8) & 0xff;
+                                                        let b: u32 = v & 0xff;
 
-                                    // TODO: Output the image
+                                                        (r << 24) | (g << 16) | (b << 8) | a
+                                                    })
+                                                    .flat_map(|val| val.to_be_bytes())
+                                                    .collect::<Vec<u8>>()
+                                            })
+                                    })
+                                    .and_then(|buf| {
+                                        match &config.image_output_dir {
+                                            Some(image_dir) => {
+                                                println!("Saving image...");
+                                                let mut sha = Sha256::new();
 
-                                    res
+                                                sha.update(buf.as_slice());
+
+                                                let mut file_path = PathBuf::from(image_dir);
+                                                file_path.push(format!("{:X}.png", sha.finalize()));
+
+                                                img::save_buffer(
+                                                    file_path.as_path(),
+                                                    buf.as_slice(),
+                                                    config.screen.width as u32,
+                                                    config.screen.height as u32,
+                                                    img::ColorType::Rgba8,
+                                                )
+                                                .map_err(|e| {
+                                                    let error = e.to_string();
+                                                    TracerError::ImageSave(error)
+                                                })
+                                                .map(|_| {
+                                                    println!(
+                                                        "Saved image to: {}",
+                                                        file_path.to_string_lossy()
+                                                    );
+                                                })
+                                            }
+                                            None => Ok(()),
+                                        }
+                                    })
                                 },
                             )
                     });
+            }
+
+            if render_res.is_err() {
+                exit.signal();
             }
         });
 
@@ -109,7 +166,7 @@ fn run(config: Config) -> Result<(), TracerError> {
             })
             .and_then(|mut window| {
                 let mut t = Instant::now();
-                while window.is_open() && !window.is_key_down(Key::Escape) {
+                while window.is_open() && !window.is_key_down(Key::Escape) && !exit.status() {
                     let dt = t.elapsed().as_micros() as f64 / 1000000.0;
                     t = Instant::now();
                     // Sleep a bit to not hog the lock on the buffer all the time.
