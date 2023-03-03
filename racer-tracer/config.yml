@@ -17,3 +17,5 @@ screen:
   height: 720
 
 scene: ./scene.yml
+
+image_output_dir: "../"
