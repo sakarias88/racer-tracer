@@ -30,18 +30,16 @@ use crate::{
 };
 
 fn run(config: Config) -> Result<(), TracerError> {
-    let preview_render_data = config.preview;
-    let render_data = config.render;
     let image = image::Image::new(config.screen.width, config.screen.height);
+    let screen_buffer: RwLock<Vec<u32>> = RwLock::new(vec![0; image.width * image.height]);
     let camera = RwLock::new(Camera::new(&image, 2.0, 1.0));
     let scene: Scene = config
         .scene
         .ok_or(TracerError::NoScene())
         .and_then(Scene::from_file)?;
-    let screen_buffer: RwLock<Vec<u32>> = RwLock::new(vec![0; image.width * image.height]);
 
     let mut window_res: Result<(), TracerError> = Ok(());
-    let move_camera = &camera;
+    let mut render_res: Result<(), TracerError> = Ok(());
 
     let render_image = SignalEvent::manual(false);
     let cancel_render = SignalEvent::manual(false);
@@ -49,41 +47,54 @@ fn run(config: Config) -> Result<(), TracerError> {
 
     rayon::scope(|s| {
         s.spawn(|_| {
-            loop {
-                if exit.wait_timeout(Duration::from_secs(0)) {
-                    return;
-                }
+            while render_res.is_ok() {
+                render_res = (!exit.wait_timeout(Duration::from_secs(0)))
+                    .then_some(|| ())
+                    .ok_or(TracerError::ExitEvent)
+                    .and_then(|_| {
+                        render_image
+                            .wait_timeout(Duration::from_secs(0))
+                            .then_some(|| ())
+                            .map_or_else(
+                                || {
+                                    // Render preview
+                                    render(
+                                        &screen_buffer,
+                                        &camera,
+                                        &image,
+                                        &scene,
+                                        &config.preview,
+                                        None,
+                                        Some(config.preview.scale),
+                                    )
+                                },
+                                |_| {
+                                    let render_time = Instant::now();
+                                    let res = render(
+                                        &screen_buffer,
+                                        &camera,
+                                        &image,
+                                        &scene,
+                                        &config.render,
+                                        Some(&cancel_render),
+                                        None,
+                                    );
+                                    render_image.reset();
 
-                if render_image.wait_timeout(Duration::from_secs(0)) && render_image.status() {
-                    let render_time = Instant::now();
-                    render(
-                        &screen_buffer,
-                        &camera,
-                        &image,
-                        &scene,
-                        &render_data,
-                        Some(&cancel_render),
-                        None,
-                    );
+                                    println!(
+                                        "It took {} seconds to render the image.",
+                                        Instant::now().duration_since(render_time).as_secs()
+                                    );
 
-                    println!(
-                        "It took {} seconds to render the image.",
-                        Instant::now().duration_since(render_time).as_millis()
-                    );
-                } else {
-                    // Render preview
-                    render(
-                        &screen_buffer,
-                        &camera,
-                        &image,
-                        &scene,
-                        &preview_render_data,
-                        None,
-                        Some(preview_render_data.scale),
-                    );
-                }
+                                    // TODO: Output the image
+
+                                    res
+                                },
+                            )
+                    });
             }
         });
+
         s.spawn(|_| {
             window_res = Window::new(
                 "racer-tracer",
@@ -106,28 +117,32 @@ fn run(config: Config) -> Result<(), TracerError> {
 
                     if window.is_key_released(Key::R) {
                         if render_image.status() {
+                            // Signal cancel
                             cancel_render.signal();
                             render_image.reset();
                         } else {
+                            // Signal render
                             render_image.signal();
                             cancel_render.reset();
                         }
                     }
 
-                    {
-                        let mut cam = move_camera.write().expect("TODO");
-                        if window.is_key_down(Key::W) {
-                            cam.go_forward(-dt);
-                        } else if window.is_key_down(Key::S) {
-                            cam.go_forward(dt);
-                        }
+                    camera
+                        .write()
+                        .map_err(|e| TracerError::FailedToAcquireLock(e.to_string()))
+                        .map(|mut cam| {
+                            if window.is_key_down(Key::W) {
+                                cam.go_forward(-dt);
+                            } else if window.is_key_down(Key::S) {
+                                cam.go_forward(dt);
+                            }
 
-                        if window.is_key_down(Key::A) {
-                            cam.go_right(-dt);
-                        } else if window.is_key_down(Key::D) {
-                            cam.go_right(dt);
-                        }
-                    }
+                            if window.is_key_down(Key::A) {
+                                cam.go_right(-dt);
+                            } else if window.is_key_down(Key::D) {
+                                cam.go_right(dt);
+                            }
+                        })?;
 
                     screen_buffer
                         .read()
@@ -139,16 +154,22 @@ fn run(config: Config) -> Result<(), TracerError> {
                         })?
                 }
                 exit.signal();
+                cancel_render.signal();
                 Ok(())
             });
         });
     });
-    window_res
+
+    window_res.and(render_res)
 }
 use structopt::StructOpt;
 fn main() {
-    if let Err(e) = Config::try_from(Args::from_args()).and_then(run) {
-        eprintln!("{}", e);
-        std::process::exit(e.into())
+    match Config::try_from(Args::from_args()).and_then(run) {
+        Err(TracerError::ExitEvent) => {}
+        Ok(_) => {}
+        Err(e) => {
+            eprintln!("{}", e);
+            std::process::exit(e.into())
+        }
     }
 }

@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-#[derive(Clone, Error, Debug)]
+#[derive(Clone, Error, Debug, PartialEq, Eq)]
 pub enum TracerError {
     #[error("Unknown error: {message}")]
     Unknown { message: String, exit_code: i32 },
@@ -22,6 +22,15 @@ pub enum TracerError {
 
     #[error("No scene supplied.")]
     NoScene(),
+
+    #[error("Failed to acquire lock \"{0}\"")]
+    FailedToAcquireLock(String),
+
+    #[error("Exit event")]
+    ExitEvent,
+
+    #[error("Cancel event")]
+    CancelEvent,
 }
 
 impl From<TracerError> for i32 {
@@ -37,6 +46,9 @@ impl From<TracerError> for i32 {
             TracerError::Configuration(_, _) => 5,
             TracerError::UnknownMaterial(_) => 6,
             TracerError::NoScene() => 7,
+            TracerError::FailedToAcquireLock(_) => 8,
+            TracerError::ExitEvent => 9,
+            TracerError::CancelEvent => 10,
         }
     }
 }
