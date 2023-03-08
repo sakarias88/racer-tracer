@@ -1,0 +1,25 @@
+---
+materials:
+  left:
+    Lambertian:
+      color:
+        data: [ 0.0, 0.0, 1.0 ]
+
+  right:
+    Lambertian:
+      color:
+        data: [ 1.0, 0.0, 0.0 ]
+
+geometry:
+  - Sphere:
+      pos:
+        data: [ -0.707, 0.0, -1.0 ]
+      radius: 0.707
+      material: left
+
+  - Sphere:
+      pos:
+        data: [ 0.707, 0.0, -1.0 ]
+      radius: 0.707
+      material: right
+
