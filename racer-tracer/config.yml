@@ -16,6 +16,6 @@ screen:
   width: 1280
   height: 720
 
-scene: ./scene.yml
+scene: ../resources/scenes/three_balls.yml
 
 image_output_dir: "../"
