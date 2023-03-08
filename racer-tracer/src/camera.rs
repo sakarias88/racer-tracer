@@ -1,5 +1,6 @@
 use crate::image::Image;
 use crate::ray::Ray;
+use crate::util::degrees_to_radians;
 use crate::vec3::Vec3;
 
 #[derive(Clone)]
@@ -11,35 +12,49 @@ pub struct Camera {
     pub horizontal: Vec3,
     pub vertical: Vec3,
     pub upper_left_corner: Vec3,
+    pub forward: Vec3,
+    pub right: Vec3,
+    pub up: Vec3,
 }
 
 impl Camera {
-    pub fn new(image: &Image, viewport_height: f64, focal_length: f64) -> Camera {
+    pub fn new(
+        look_from: Vec3,
+        look_at: Vec3,
+        up: Vec3,
+        vfov: f64,
+        image: &Image,
+        focal_length: f64,
+    ) -> Camera {
+        let h = (degrees_to_radians(vfov) / 2.0).tan();
+        let viewport_height = 2.0 * h;
         let viewport_width = image.aspect_ratio * viewport_height;
-        let origin = Vec3::new(0.0, 0.0, 0.0);
-        let horizontal = Vec3::new(viewport_width, 0.0, 0.0);
-        let vertical = Vec3::new(0.0, viewport_height, 0.0);
+
+        let forward = (look_from - look_at).unit_vector();
+        let right = up.cross(&forward).unit_vector();
+        let up = forward.cross(&right);
+
+        let horizontal = viewport_width * right;
+        let vertical = viewport_height * up;
+
         Camera {
             viewport_height,
             viewport_width,
             focal_length,
-            origin,
+            origin: look_from,
             horizontal,
             vertical,
-            upper_left_corner: origin + vertical / 2.0
-                - horizontal / 2.0
-                - Vec3::new(0.0, 0.0, focal_length),
+            upper_left_corner: look_from + vertical / 2.0 - horizontal / 2.0 - forward,
+            forward,
+            right,
+            up,
         }
     }
 
     pub fn get_ray(&self, u: f64, v: f64) -> Ray {
-        let upper_left_corner = self.origin + self.vertical / 2.0
-            - self.horizontal / 2.0
-            - Vec3::new(0.0, 0.0, self.focal_length);
-
         Ray::new(
             self.origin,
-            upper_left_corner + u * self.horizontal - v * self.vertical - self.origin,
+            self.upper_left_corner + u * self.horizontal - v * self.vertical - self.origin,
         )
     }
 
@@ -47,11 +62,17 @@ impl Camera {
 
     // TODO: Use forward facing vector
     pub fn go_forward(&mut self, go: f64) {
-        self.origin += Vec3::new(0.0, 0.0, go);
+        self.origin += self.forward * go;
+
+        self.upper_left_corner =
+            self.origin + self.vertical / 2.0 - self.horizontal / 2.0 - self.forward;
     }
 
     // TODO: Use right facing vector
     pub fn go_right(&mut self, go: f64) {
-        self.origin += Vec3::new(go, 0.0, 0.0);
+        self.origin += self.right * go;
+
+        self.upper_left_corner =
+            self.origin + self.vertical / 2.0 - self.horizontal / 2.0 - self.forward;
     }
 }
