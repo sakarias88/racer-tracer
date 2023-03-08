@@ -25,6 +25,8 @@ use minifb::{Key, Window, WindowOptions};
 use sha2::{Digest, Sha256};
 use synchronoise::SignalEvent;
 
+use crate::vec3::Vec3;
+
 use crate::{
     camera::Camera,
     config::{Args, Config},
@@ -36,7 +38,14 @@ use crate::{
 fn run(config: Config) -> Result<(), TracerError> {
     let image = image::Image::new(config.screen.width, config.screen.height);
     let screen_buffer: RwLock<Vec<u32>> = RwLock::new(vec![0; image.width * image.height]);
-    let camera = RwLock::new(Camera::new(&image, 2.0, 1.0));
+    let camera = RwLock::new(Camera::new(
+        Vec3::new(-2.0, 2.0, 1.0),
+        Vec3::new(0.0, 0.0, -1.0),
+        Vec3::new(0.0, 1.0, 0.0),
+        90.0,
+        &image,
+        1.0,
+    ));
     let scene: Scene = config
         .scene
         .ok_or(TracerError::NoScene())
