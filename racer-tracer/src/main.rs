@@ -4,6 +4,7 @@ mod camera;
 mod config;
 mod geometry;
 mod image;
+mod image_action;
 mod material;
 mod ray;
 mod render;
@@ -15,14 +16,13 @@ extern crate image as img;
 
 use std::{
     convert::TryFrom,
-    path::PathBuf,
     sync::RwLock,
     time::{Duration, Instant},
     vec::Vec,
 };
 
+use image_action::ImageAction;
 use minifb::{Key, Window, WindowOptions};
-use sha2::{Digest, Sha256};
 use synchronoise::SignalEvent;
 
 use crate::vec3::Vec3;
@@ -38,18 +38,19 @@ use crate::{
 fn run(config: Config) -> Result<(), TracerError> {
     let image = image::Image::new(config.screen.width, config.screen.height);
     let screen_buffer: RwLock<Vec<u32>> = RwLock::new(vec![0; image.width * image.height]);
+    let look_from = Vec3::new(13.0, 2.0, 3.0);
+    let look_at = Vec3::new(0.0, 0.0, 0.0);
     let camera = RwLock::new(Camera::new(
-        Vec3::new(-2.0, 2.0, 1.0),
-        Vec3::new(0.0, 0.0, -1.0),
+        look_from,
+        look_at,
         Vec3::new(0.0, 1.0, 0.0),
-        90.0,
+        20.0,
         &image,
-        1.0,
+        0.1,
+        10.0,
     ));
-    let scene: Scene = config
-        .scene
-        .ok_or(TracerError::NoScene())
-        .and_then(Scene::from_file)?;
+
+    let scene = Scene::try_new((&config.loader).into())?;
 
     let mut window_res: Result<(), TracerError> = Ok(());
     let mut render_res: Result<(), TracerError> = Ok(());
@@ -57,6 +58,8 @@ fn run(config: Config) -> Result<(), TracerError> {
     let render_image = SignalEvent::manual(false);
     let cancel_render = SignalEvent::manual(false);
     let exit = SignalEvent::manual(false);
+
+    let image_action: Box<dyn ImageAction> = (&config.image_action).into();
 
     rayon::scope(|s| {
         s.spawn(|_| {
@@ -94,62 +97,11 @@ fn run(config: Config) -> Result<(), TracerError> {
                                     )
                                     .and_then(|_| {
                                         render_image.reset();
-
                                         println!(
                                             "It took {} seconds to render the image.",
                                             Instant::now().duration_since(render_time).as_secs()
                                         );
-                                        screen_buffer
-                                            .read()
-                                            .map_err(|e| {
-                                                TracerError::FailedToAcquireLock(e.to_string())
-                                            })
-                                            .map(|buf| {
-                                                // Convert ARGB8 to RGBA8
-                                                buf.iter()
-                                                    .map(|v| {
-                                                        let a: u32 = (v >> 24) & 0xff;
-                                                        let r: u32 = (v >> 16) & 0xff;
-                                                        let g: u32 = (v >> 8) & 0xff;
-                                                        let b: u32 = v & 0xff;
-
-                                                        (r << 24) | (g << 16) | (b << 8) | a
-                                                    })
-                                                    .flat_map(|val| val.to_be_bytes())
-                                                    .collect::<Vec<u8>>()
-                                            })
-                                    })
-                                    .and_then(|buf| {
-                                        match &config.image_output_dir {
-                                            Some(image_dir) => {
-                                                println!("Saving image...");
-                                                let mut sha = Sha256::new();
-
-                                                sha.update(buf.as_slice());
-
-                                                let mut file_path = PathBuf::from(image_dir);
-                                                file_path.push(format!("{:X}.png", sha.finalize()));
-
-                                                img::save_buffer(
-                                                    file_path.as_path(),
-                                                    buf.as_slice(),
-                                                    config.screen.width as u32,
-                                                    config.screen.height as u32,
-                                                    img::ColorType::Rgba8,
-                                                )
-                                                .map_err(|e| {
-                                                    let error = e.to_string();
-                                                    TracerError::ImageSave(error)
-                                                })
-                                                .map(|_| {
-                                                    println!(
-                                                        "Saved image to: {}",
-                                                        file_path.to_string_lossy()
-                                                    );
-                                                })
-                                            }
-                                            None => Ok(()),
-                                        }
+                                        image_action.action(&screen_buffer, &render_image, &config)
                                     })
                                 },
                             )

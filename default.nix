@@ -61,5 +61,6 @@ nixpkgs.stdenv.mkDerivation {
   shellHook = ''
     export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${nixpkgs.lib.makeLibraryPath [ nixpkgs.xorg.libX11 nixpkgs.xorg.libXcursor ] }
     export RUST_SRC_PATH=${rustSrcNoSymlinks}
+    cd ${builtins.toString ./.}/racer-tracer
   '';
 }

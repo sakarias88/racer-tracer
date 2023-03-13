@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, str::FromStr};
 
 use config::File;
 use serde::Deserialize;
@@ -34,17 +34,74 @@ pub struct Args {
 
     #[structopt(short = "s", long = "scene")]
     pub scene: Option<String>,
+
+    #[structopt(long = "image-action")]
+    pub image_action: Option<ImageAction>,
 }
 
 impl TryFrom<Args> for Config {
     type Error = TracerError;
     fn try_from(args: Args) -> Result<Self, TracerError> {
-        Config::from_file(args.config).map(|mut cfg| {
-            if args.scene.is_some() {
-                cfg.scene = args.scene;
+        Config::from_file(args.config).and_then(|mut cfg| {
+            if let Some(image_action) = args.image_action {
+                cfg.image_action = image_action;
             }
-            cfg
+
+            if let Some(scene) = args.scene {
+                if scene == "random" {
+                    cfg.loader = SceneLoader::Random;
+                } else {
+                    let path = PathBuf::from(scene);
+                    cfg.loader = path
+                        .extension()
+                        .map(|s| s.to_string_lossy())
+                        .ok_or_else(|| {
+                            TracerError::ArgumentParsingError(format!(
+                                "Could not get extension from scene file: {}",
+                                path.display()
+                            ))
+                        })
+                        .and_then(|p| match p.as_ref() {
+                            "yml" => Ok(SceneLoader::Yml { path: path.clone() }),
+                            _ => Err(TracerError::ArgumentParsingError(format!(
+                                "Could not find a suitable scene loader for file: {}",
+                                path.display()
+                            ))),
+                        })?;
+                };
+            }
+
+            Ok(cfg)
         })
+    }
+}
+
+#[derive(StructOpt, Debug, Clone, Deserialize, Default)]
+pub enum SceneLoader {
+    #[default]
+    None,
+    Yml {
+        path: PathBuf,
+    },
+    Random,
+}
+
+#[derive(StructOpt, Debug, Clone, Deserialize, Default)]
+pub enum ImageAction {
+    #[default]
+    WaitForSignal,
+    SavePng,
+}
+
+impl FromStr for ImageAction {
+    type Err = TracerError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "png" => Ok(ImageAction::SavePng),
+            "show" => Ok(ImageAction::WaitForSignal),
+            _ => Ok(ImageAction::WaitForSignal),
+        }
     }
 }
 
@@ -60,7 +117,10 @@ pub struct Config {
     pub screen: Screen,
 
     #[serde(default)]
-    pub scene: Option<String>,
+    pub loader: SceneLoader,
+
+    #[serde(default)]
+    pub image_action: ImageAction,
 
     #[serde(default)]
     pub image_output_dir: Option<PathBuf>,

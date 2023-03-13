@@ -17,7 +17,7 @@ materials:
   right:
     Metal:
       color:
-        data: [ 0.8, 0.6, 0.2]
+        data: [ 0.8, 0.6, 0.2 ]
       fuzz: 0.0
 
 geometry:
