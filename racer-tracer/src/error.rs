@@ -20,6 +20,9 @@ pub enum TracerError {
     #[error("Config Error ({0}): {1}")]
     Configuration(String, String),
 
+    #[error("Argument parsing Error: {0}")]
+    ArgumentParsingError(String),
+
     #[error("Unknown Material {0}.")]
     UnknownMaterial(String),
 
@@ -37,6 +40,9 @@ pub enum TracerError {
 
     #[error("Image save error: {0}")]
     ImageSave(String),
+
+    #[error("Scene failed to load: {0}")]
+    SceneLoad(String),
 }
 
 impl From<TracerError> for i32 {
@@ -57,6 +63,8 @@ impl From<TracerError> for i32 {
             TracerError::CancelEvent => 10,
             TracerError::Generic(_) => 11,
             TracerError::ImageSave(_) => 12,
+            TracerError::SceneLoad(_) => 13,
+            TracerError::ArgumentParsingError(_) => 14,
         }
     }
 }

@@ -1,13 +1,10 @@
-use std::{collections::HashMap, path::Path, sync::Arc};
-
-use config::File;
-use serde::Deserialize;
+pub mod none;
+pub mod random;
+pub mod yml;
 
 use crate::{
-    error::TracerError,
-    geometry::{sphere::Sphere, Hittable},
-    material::{dialectric::Dialectric, lambertian::Lambertian, metal::Metal, SharedMaterial},
-    vec3::{Color, Vec3},
+    config::SceneLoader as CSLoader, error::TracerError, geometry::Hittable,
+    scene::none::NoneLoader, scene::random::Random, scene::yml::YmlLoader,
 };
 
 pub struct Scene {
@@ -16,19 +13,13 @@ pub struct Scene {
 
 impl Scene {
     #[allow(dead_code)]
-    pub fn new() -> Self {
-        Self {
-            objects: Vec::new(),
-        }
+    pub fn try_new(loader: Box<dyn SceneLoader>) -> Result<Self, TracerError> {
+        loader.load().map(|objects| Self { objects })
     }
 
     #[allow(dead_code)]
     pub fn add(&mut self, hittable: Box<dyn Hittable>) {
         self.objects.push(hittable);
-    }
-
-    pub fn from_file<P: AsRef<Path>>(file: P) -> Result<Self, TracerError> {
-        SceneData::from_file(file)?.try_into()
     }
 }
 
@@ -53,86 +44,16 @@ impl Hittable for Scene {
     }
 }
 
-#[derive(Debug, Deserialize)]
-enum MaterialData {
-    Lambertian { color: Color },
-    Metal { color: Color, fuzz: f64 },
-    Dialectric { refraction_index: f64 },
+pub trait SceneLoader: Send + Sync {
+    fn load(&self) -> Result<Vec<Box<dyn Hittable>>, TracerError>;
 }
 
-#[derive(Debug, Deserialize)]
-enum GeometryData {
-    Sphere {
-        pos: Vec3,
-        radius: f64,
-        material: String,
-    },
-}
-
-#[derive(Deserialize)]
-struct SceneData {
-    materials: HashMap<String, MaterialData>,
-    geometry: Vec<GeometryData>,
-}
-
-impl SceneData {
-    pub fn from_file<P: AsRef<Path>>(file: P) -> Result<Self, TracerError> {
-        config::Config::builder()
-            .add_source(File::from(file.as_ref()))
-            .build()
-            .map_err(|e| {
-                TracerError::Configuration(
-                    file.as_ref().to_string_lossy().into_owned(),
-                    e.to_string(),
-                )
-            })?
-            .try_deserialize()
-            .map_err(|e| {
-                TracerError::Configuration(
-                    file.as_ref().to_string_lossy().into_owned(),
-                    e.to_string(),
-                )
-            })
-    }
-}
-
-impl TryInto<Scene> for SceneData {
-    type Error = TracerError;
-    fn try_into(self) -> Result<Scene, TracerError> {
-        let mut materials: HashMap<String, SharedMaterial> = HashMap::new();
-        self.materials
-            .into_iter()
-            .for_each(|(id, material)| match material {
-                MaterialData::Lambertian { color } => {
-                    materials.insert(id, Arc::new(Box::new(Lambertian::new(color))));
-                }
-                MaterialData::Metal { color, fuzz } => {
-                    materials.insert(id, Arc::new(Box::new(Metal::new(color, fuzz))));
-                }
-                MaterialData::Dialectric { refraction_index } => {
-                    materials.insert(id, Arc::new(Box::new(Dialectric::new(refraction_index))));
-                }
-            });
-
-        let geometry: Vec<Box<dyn Hittable>> = self
-            .geometry
-            .into_iter()
-            .map(|geo| match geo {
-                GeometryData::Sphere {
-                    pos,
-                    radius,
-                    material,
-                } => materials
-                    .get(&material)
-                    .ok_or(TracerError::UnknownMaterial(material))
-                    .map(|mat| {
-                        let apa: Box<dyn Hittable> =
-                            Box::new(Sphere::new(pos, radius, Arc::clone(mat)));
-                        apa
-                    }),
-            })
-            .collect::<Result<Vec<Box<dyn Hittable>>, TracerError>>()?;
-
-        Ok(Scene { objects: geometry })
+impl From<&CSLoader> for Box<dyn SceneLoader> {
+    fn from(loader: &CSLoader) -> Self {
+        match loader {
+            CSLoader::Yml { path } => Box::new(YmlLoader::new(path.clone())),
+            CSLoader::Random => Box::new(Random::new()),
+            CSLoader::None => Box::new(NoneLoader::new()),
+        }
     }
 }

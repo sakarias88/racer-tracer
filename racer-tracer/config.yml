@@ -13,9 +13,14 @@ render:
   num_threads_height: 10
 
 screen:
-  width: 1280
-  height: 720
+  width: 640
+  height: 480
 
-scene: ../resources/scenes/three_balls.yml
+loader:
+  Yml:
+    path: ../resources/scenes/three_balls.yml
 
 image_output_dir: "../"
+
+image_action:
+  SavePng # (SavePng, WaitForSignal)
