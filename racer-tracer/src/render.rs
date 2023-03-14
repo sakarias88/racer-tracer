@@ -1,4 +1,4 @@
-use std::{borrow::Borrow, sync::RwLock, time::Duration};
+use std::{sync::RwLock, time::Duration};
 
 use rayon::prelude::*;
 use synchronoise::SignalEvent;
@@ -32,6 +32,21 @@ fn ray_color(scene: &dyn Hittable, ray: &Ray, depth: usize) -> Vec3 {
     let unit_direction = ray.direction().unit_vector();
     let t = 0.5 * (unit_direction.y() + 1.0);
     (1.0 - t) * first_color + t * second_color
+}
+
+fn do_cancel(cancel_event: Option<&SignalEvent>) -> bool {
+    match cancel_event {
+        Some(event) => event.wait_timeout(Duration::from_secs(0)),
+        None => false,
+    }
+}
+
+fn get_highest_divdable(value: usize, mut div: usize) -> usize {
+    // Feels like there could possibly be some other nicer trick to this.
+    while (value % div) != 0 {
+        div -= 1;
+    }
+    div
 }
 
 pub fn raytrace_scaled(
@@ -146,21 +161,6 @@ pub fn raytrace(
         })
 }
 
-fn do_cancel(cancel_event: Option<&SignalEvent>) -> bool {
-    match cancel_event {
-        Some(event) => event.wait_timeout(Duration::from_secs(0)),
-        None => false,
-    }
-}
-
-fn get_highest_divdable(value: usize, mut div: usize) -> usize {
-    // Feels like there could possibly be some other nicer trick to this.
-    while (value % div) != 0 {
-        div -= 1;
-    }
-    div
-}
-
 pub fn render(
     buffer: &RwLock<Vec<u32>>,
     camera: &RwLock<Camera>,
@@ -228,21 +228,12 @@ pub fn render(
                 .into_par_iter()
                 .map(|image| {
                     scale.map_or_else(
-                        || {
-                            raytrace(
-                                buffer,
-                                cancel_event,
-                                (*scene).borrow(),
-                                cam.clone(),
-                                &image,
-                                data,
-                            )
-                        },
+                        || raytrace(buffer, cancel_event, scene, cam.clone(), &image, data),
                         |_| {
                             raytrace_scaled(
                                 buffer,
                                 cancel_event,
-                                (*scene).borrow(),
+                                scene,
                                 cam.clone(),
                                 &image,
                                 data,

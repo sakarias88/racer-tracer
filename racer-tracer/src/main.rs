@@ -40,6 +40,7 @@ fn run(config: Config) -> Result<(), TracerError> {
     let screen_buffer: RwLock<Vec<u32>> = RwLock::new(vec![0; image.width * image.height]);
     let look_from = Vec3::new(13.0, 2.0, 3.0);
     let look_at = Vec3::new(0.0, 0.0, 0.0);
+    let camera_speed = 2.0;
     let camera = RwLock::new(Camera::new(
         look_from,
         look_at,
@@ -50,13 +51,12 @@ fn run(config: Config) -> Result<(), TracerError> {
         10.0,
     ));
 
-    let scene = Scene::try_new((&config.loader).into())?;
+    let scene = Scene::try_new(&config.loader)?;
 
     let mut window_res: Result<(), TracerError> = Ok(());
     let mut render_res: Result<(), TracerError> = Ok(());
 
     let render_image = SignalEvent::manual(false);
-    let cancel_render = SignalEvent::manual(false);
     let exit = SignalEvent::manual(false);
 
     let image_action: Box<dyn ImageAction> = (&config.image_action).into();
@@ -73,6 +73,7 @@ fn run(config: Config) -> Result<(), TracerError> {
                             .then_some(|| ())
                             .map_or_else(
                                 || {
+                                    render_image.reset();
                                     // Render preview
                                     render(
                                         &screen_buffer,
@@ -85,6 +86,7 @@ fn run(config: Config) -> Result<(), TracerError> {
                                     )
                                 },
                                 |_| {
+                                    render_image.reset();
                                     let render_time = Instant::now();
                                     render(
                                         &screen_buffer,
@@ -92,11 +94,10 @@ fn run(config: Config) -> Result<(), TracerError> {
                                         &image,
                                         &scene,
                                         &config.render,
-                                        Some(&cancel_render),
+                                        Some(&render_image),
                                         None,
                                     )
                                     .and_then(|_| {
-                                        render_image.reset();
                                         println!(
                                             "It took {} seconds to render the image.",
                                             Instant::now().duration_since(render_time).as_secs()
@@ -134,15 +135,7 @@ fn run(config: Config) -> Result<(), TracerError> {
                     std::thread::sleep(std::time::Duration::from_millis(10));
 
                     if window.is_key_released(Key::R) {
-                        if render_image.status() {
-                            // Signal cancel
-                            cancel_render.signal();
-                            render_image.reset();
-                        } else {
-                            // Signal render
-                            render_image.signal();
-                            cancel_render.reset();
-                        }
+                        render_image.signal();
                     }
 
                     camera
@@ -150,15 +143,15 @@ fn run(config: Config) -> Result<(), TracerError> {
                         .map_err(|e| TracerError::FailedToAcquireLock(e.to_string()))
                         .map(|mut cam| {
                             if window.is_key_down(Key::W) {
-                                cam.go_forward(-dt);
+                                cam.go_forward(-dt * camera_speed);
                             } else if window.is_key_down(Key::S) {
-                                cam.go_forward(dt);
+                                cam.go_forward(dt * camera_speed);
                             }
 
                             if window.is_key_down(Key::A) {
-                                cam.go_right(-dt);
+                                cam.go_right(-dt * camera_speed);
                             } else if window.is_key_down(Key::D) {
-                                cam.go_right(dt);
+                                cam.go_right(dt * camera_speed);
                             }
                         })?;
 
@@ -172,7 +165,7 @@ fn run(config: Config) -> Result<(), TracerError> {
                         })?
                 }
                 exit.signal();
-                cancel_render.signal();
+                render_image.signal();
                 Ok(())
             });
         });
