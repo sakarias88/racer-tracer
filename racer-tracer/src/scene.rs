@@ -12,8 +12,13 @@ pub struct Scene {
 }
 
 impl Scene {
-    #[allow(dead_code)]
-    pub fn try_new(loader: Box<dyn SceneLoader>) -> Result<Self, TracerError> {
+    pub fn try_new(config_loader: &CSLoader) -> Result<Self, TracerError> {
+        let loader: Box<dyn SceneLoader> = match config_loader {
+            CSLoader::Yml { path } => Box::new(YmlLoader::new(path.clone())),
+            CSLoader::Random => Box::new(Random::new()),
+            CSLoader::None => Box::new(NoneLoader::new()),
+        };
+
         loader.load().map(|objects| Self { objects })
     }
 
@@ -46,14 +51,4 @@ impl Hittable for Scene {
 
 pub trait SceneLoader: Send + Sync {
     fn load(&self) -> Result<Vec<Box<dyn Hittable>>, TracerError>;
-}
-
-impl From<&CSLoader> for Box<dyn SceneLoader> {
-    fn from(loader: &CSLoader) -> Self {
-        match loader {
-            CSLoader::Yml { path } => Box::new(YmlLoader::new(path.clone())),
-            CSLoader::Random => Box::new(Random::new()),
-            CSLoader::None => Box::new(NoneLoader::new()),
-        }
-    }
 }
