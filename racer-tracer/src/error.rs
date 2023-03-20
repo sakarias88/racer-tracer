@@ -43,6 +43,9 @@ pub enum TracerError {
 
     #[error("Scene failed to load: {0}")]
     SceneLoad(String),
+
+    #[error("Key callback failed: {0}")]
+    KeyError(String),
 }
 
 impl From<TracerError> for i32 {
@@ -65,6 +68,7 @@ impl From<TracerError> for i32 {
             TracerError::ImageSave(_) => 12,
             TracerError::SceneLoad(_) => 13,
             TracerError::ArgumentParsingError(_) => 14,
+            TracerError::KeyError(_) => 15,
         }
     }
 }
