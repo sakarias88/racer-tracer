@@ -5,6 +5,7 @@ mod config;
 mod geometry;
 mod image;
 mod image_action;
+mod key_inputs;
 mod material;
 mod ray;
 mod render;
@@ -22,6 +23,7 @@ use std::{
 };
 
 use image_action::ImageAction;
+use key_inputs::KeyInputs;
 use minifb::{Key, Window, WindowOptions};
 use synchronoise::SignalEvent;
 
@@ -60,6 +62,54 @@ fn run(config: Config) -> Result<(), TracerError> {
     let exit = SignalEvent::manual(false);
 
     let image_action: Box<dyn ImageAction> = (&config.image_action).into();
+
+    // Setting up controls
+    let mut key_inputs = KeyInputs::new();
+    let render_image_fn = |_| {
+        render_image.signal();
+        Ok(())
+    };
+    key_inputs.release(Key::R, &render_image_fn);
+
+    let go_forward = |dt: f64| {
+        camera
+            .write()
+            .map_err(|e| TracerError::KeyError(e.to_string()))
+            .map(|mut cam| {
+                cam.go_forward(-dt * camera_speed);
+            })
+    };
+    key_inputs.down(Key::W, &go_forward);
+
+    let go_back = |dt: f64| {
+        camera
+            .write()
+            .map_err(|e| TracerError::KeyError(e.to_string()))
+            .map(|mut cam| {
+                cam.go_forward(dt * camera_speed);
+            })
+    };
+    key_inputs.down(Key::S, &go_back);
+
+    let go_left = |dt: f64| {
+        camera
+            .write()
+            .map_err(|e| TracerError::KeyError(e.to_string()))
+            .map(|mut cam| {
+                cam.go_right(-dt * camera_speed);
+            })
+    };
+    key_inputs.down(Key::A, &go_left);
+
+    let go_right = |dt: f64| {
+        camera
+            .write()
+            .map_err(|e| TracerError::KeyError(e.to_string()))
+            .map(|mut cam| {
+                cam.go_right(dt * camera_speed);
+            })
+    };
+    key_inputs.down(Key::D, &go_right);
 
     rayon::scope(|s| {
         s.spawn(|_| {
@@ -131,29 +181,9 @@ fn run(config: Config) -> Result<(), TracerError> {
                 while window.is_open() && !window.is_key_down(Key::Escape) && !exit.status() {
                     let dt = t.elapsed().as_micros() as f64 / 1000000.0;
                     t = Instant::now();
+                    key_inputs.update(&window, dt);
                     // Sleep a bit to not hog the lock on the buffer all the time.
-                    std::thread::sleep(std::time::Duration::from_millis(10));
-
-                    if window.is_key_released(Key::R) {
-                        render_image.signal();
-                    }
-
-                    camera
-                        .write()
-                        .map_err(|e| TracerError::FailedToAcquireLock(e.to_string()))
-                        .map(|mut cam| {
-                            if window.is_key_down(Key::W) {
-                                cam.go_forward(-dt * camera_speed);
-                            } else if window.is_key_down(Key::S) {
-                                cam.go_forward(dt * camera_speed);
-                            }
-
-                            if window.is_key_down(Key::A) {
-                                cam.go_right(-dt * camera_speed);
-                            } else if window.is_key_down(Key::D) {
-                                cam.go_right(dt * camera_speed);
-                            }
-                        })?;
+                    std::thread::sleep(std::time::Duration::from_millis(1));
 
                     screen_buffer
                         .read()
