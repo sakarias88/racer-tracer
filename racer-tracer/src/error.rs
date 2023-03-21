@@ -2,20 +2,11 @@ use thiserror::Error;
 
 #[derive(Clone, Error, Debug, PartialEq, Eq)]
 pub enum TracerError {
-    #[error("Unknown error: {message}")]
-    Unknown { message: String, exit_code: i32 },
-
-    #[error("Error: {0}")]
-    Generic(String),
-
     #[error("Failed to create window: {0}")]
     FailedToCreateWindow(String),
 
     #[error("Failed to update window: {0}")]
     FailedToUpdateWindow(String),
-
-    #[error("Resolution is not power of two.")]
-    ResolutionIsNotPowerOfTwo(),
 
     #[error("Config Error ({0}): {1}")]
     Configuration(String, String),
@@ -25,9 +16,6 @@ pub enum TracerError {
 
     #[error("Unknown Material {0}.")]
     UnknownMaterial(String),
-
-    #[error("No scene supplied.")]
-    NoScene(),
 
     #[error("Failed to acquire lock \"{0}\"")]
     FailedToAcquireLock(String),
@@ -54,25 +42,18 @@ pub enum TracerError {
 impl From<TracerError> for i32 {
     fn from(tracer_error: TracerError) -> Self {
         match tracer_error {
-            TracerError::Unknown {
-                message: _,
-                exit_code,
-            } => exit_code,
-            TracerError::FailedToCreateWindow(_) => 2,
-            TracerError::FailedToUpdateWindow(_) => 3,
-            TracerError::ResolutionIsNotPowerOfTwo() => 4,
-            TracerError::Configuration(_, _) => 5,
-            TracerError::UnknownMaterial(_) => 6,
-            TracerError::NoScene() => 7,
-            TracerError::FailedToAcquireLock(_) => 8,
-            TracerError::ExitEvent => 9,
-            TracerError::CancelEvent => 10,
-            TracerError::Generic(_) => 11,
-            TracerError::ImageSave(_) => 12,
-            TracerError::SceneLoad(_) => 13,
-            TracerError::ArgumentParsingError(_) => 14,
-            TracerError::KeyError(_) => 15,
-            TracerError::CreateLogError(_) => 16,
+            TracerError::FailedToCreateWindow(_) => 1,
+            TracerError::FailedToUpdateWindow(_) => 2,
+            TracerError::Configuration(_, _) => 3,
+            TracerError::UnknownMaterial(_) => 4,
+            TracerError::FailedToAcquireLock(_) => 5,
+            TracerError::ExitEvent => 6,
+            TracerError::CancelEvent => 7,
+            TracerError::ImageSave(_) => 8,
+            TracerError::SceneLoad(_) => 9,
+            TracerError::ArgumentParsingError(_) => 10,
+            TracerError::KeyError(_) => 11,
+            TracerError::CreateLogError(_) => 12,
         }
     }
 }
