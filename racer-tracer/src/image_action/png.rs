@@ -1,9 +1,10 @@
 use std::{path::PathBuf, sync::RwLock};
 
 use sha2::{Digest, Sha256};
+use slog::Logger;
 use synchronoise::SignalEvent;
 
-use crate::{config::Config, error::TracerError};
+use crate::{config::Config, error::TracerError, terminal::Terminal};
 
 use super::ImageAction;
 
@@ -15,6 +16,8 @@ impl ImageAction for SavePng {
         screen_buffer: &RwLock<Vec<u32>>,
         event: &SignalEvent,
         config: &Config,
+        log: Logger,
+        _term: &Terminal,
     ) -> Result<(), TracerError> {
         let status = event.status();
         event.reset();
@@ -40,7 +43,7 @@ impl ImageAction for SavePng {
                 })
                 .and_then(|buf| match &config.image_output_dir {
                     Some(image_dir) => {
-                        println!("Saving image...");
+                        info!(log, "Saving image...");
                         let mut sha = Sha256::new();
 
                         sha.update(buf.as_slice());
@@ -60,7 +63,7 @@ impl ImageAction for SavePng {
                             TracerError::ImageSave(error)
                         })
                         .map(|_| {
-                            println!("Saved image to: {}", file_path.to_string_lossy());
+                            info!(log, "Saved image to: {}", file_path.to_string_lossy());
                         })
                     }
                     None => Ok(()),

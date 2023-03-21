@@ -10,22 +10,31 @@ mod material;
 mod ray;
 mod render;
 mod scene;
+mod terminal;
 mod util;
 mod vec3;
 
 extern crate image as img;
 
+#[macro_use]
+extern crate slog;
+extern crate slog_async;
+extern crate slog_term;
+
 use std::{
     convert::TryFrom,
+    fs::OpenOptions,
+    path::Path,
     sync::RwLock,
     time::{Duration, Instant},
     vec::Vec,
 };
 
-use image_action::ImageAction;
-use key_inputs::KeyInputs;
 use minifb::{Key, Window, WindowOptions};
+use slog::{Drain, Logger};
+use structopt::StructOpt;
 use synchronoise::SignalEvent;
+use terminal::Terminal;
 
 use crate::vec3::Vec3;
 
@@ -33,11 +42,15 @@ use crate::{
     camera::Camera,
     config::{Args, Config},
     error::TracerError,
+    image_action::ImageAction,
+    key_inputs::KeyInputs,
     render::render,
     scene::Scene,
 };
 
-fn run(config: Config) -> Result<(), TracerError> {
+fn run(config: Config, log: Logger, term: Terminal) -> Result<(), TracerError> {
+    info!(log, "Starting racer-tracer {}", env!("CARGO_PKG_VERSION"));
+
     let image = image::Image::new(config.screen.width, config.screen.height);
     let screen_buffer: RwLock<Vec<u32>> = RwLock::new(vec![0; image.width * image.height]);
     let look_from = Vec3::new(13.0, 2.0, 3.0);
@@ -64,7 +77,7 @@ fn run(config: Config) -> Result<(), TracerError> {
     let image_action: Box<dyn ImageAction> = (&config.image_action).into();
 
     // Setting up controls
-    let mut key_inputs = KeyInputs::new();
+    let mut key_inputs = KeyInputs::new(log.new(o!("scope" => "key-intputs")));
     let render_image_fn = |_| {
         render_image.signal();
         Ok(())
@@ -148,11 +161,18 @@ fn run(config: Config) -> Result<(), TracerError> {
                                         None,
                                     )
                                     .and_then(|_| {
-                                        println!(
+                                        info!(
+                                            log,
                                             "It took {} seconds to render the image.",
                                             Instant::now().duration_since(render_time).as_secs()
                                         );
-                                        image_action.action(&screen_buffer, &render_image, &config)
+                                        image_action.action(
+                                            &screen_buffer,
+                                            &render_image,
+                                            &config,
+                                            log.new(o!("scope" => "image-action")),
+                                            &term,
+                                        )
                                     })
                                 },
                             )
@@ -203,14 +223,47 @@ fn run(config: Config) -> Result<(), TracerError> {
 
     window_res.and(render_res)
 }
-use structopt::StructOpt;
+
+fn create_log(log_file: &Path) -> Result<Logger, TracerError> {
+    OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .open(log_file)
+        .map(slog_term::PlainDecorator::new)
+        .map(|log| slog_term::FullFormat::new(log).build().fuse())
+        .map_err(|e| TracerError::CreateLogError(e.to_string()))
+        .map(|file_drain| {
+            let term_drain = slog_term::FullFormat::new(slog_term::TermDecorator::new().build())
+                .build()
+                .fuse();
+            (file_drain, term_drain)
+        })
+        .map(|(file_drain, term_drain)| {
+            let combined =
+                slog_async::Async::new(slog::Duplicate::new(term_drain, file_drain).fuse())
+                    .build()
+                    .fuse();
+            Logger::root(combined, o!())
+        })
+}
+
 fn main() {
-    match Config::try_from(Args::from_args()).and_then(run) {
+    let log_file = std::env::temp_dir().join("racer-tracer.log");
+    let log = create_log(log_file.as_ref()).expect("Expected to be able to create a log");
+    let term = Terminal::new(log.new(o!("scope" => "terminal")));
+    terminal::write_term!(term, &format!("Log file: {}", log_file.display()));
+
+    match Config::try_from(Args::from_args())
+        .and_then(|config| run(config, log.new(o!("scope" => "run")), term))
+    {
         Err(TracerError::ExitEvent) => {}
         Ok(_) => {}
         Err(e) => {
-            eprintln!("{}", e);
-            std::process::exit(e.into())
+            error!(log, "{}", e);
+            let exit_code = i32::from(e);
+            error!(log, "Exiting with: {}", exit_code);
+            std::process::exit(exit_code)
         }
     }
 }

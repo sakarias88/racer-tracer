@@ -16,4 +16,8 @@ synchronoise = "1.0.1"
 config = "0.13.3"
 sha2 = "0.10.6"
 image = "0.24.5"
+slog-term = "2"
+slog = "2"
+slog-async = "2"
+console = "0.15"
 serde = { version = "1", features = ["derive"] }

@@ -3,10 +3,12 @@ pub mod wait_for_signal;
 
 use std::sync::RwLock;
 
+use slog::Logger;
 use synchronoise::SignalEvent;
 
 use crate::image_action::{png::SavePng, wait_for_signal::WaitForSignal};
 
+use crate::terminal::Terminal;
 use crate::{
     config::{Config, ImageAction as CImageAction},
     error::TracerError,
@@ -18,6 +20,8 @@ pub trait ImageAction: Send + Sync {
         screen_buffer: &RwLock<Vec<u32>>,
         event: &SignalEvent,
         config: &Config,
+        log: Logger,
+        term: &Terminal,
     ) -> Result<(), TracerError>;
 }
 
