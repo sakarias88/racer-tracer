@@ -46,6 +46,9 @@ pub enum TracerError {
 
     #[error("Key callback failed: {0}")]
     KeyError(String),
+
+    #[error("Failed to create log: {0}")]
+    CreateLogError(String),
 }
 
 impl From<TracerError> for i32 {
@@ -69,6 +72,7 @@ impl From<TracerError> for i32 {
             TracerError::SceneLoad(_) => 13,
             TracerError::ArgumentParsingError(_) => 14,
             TracerError::KeyError(_) => 15,
+            TracerError::CreateLogError(_) => 16,
         }
     }
 }

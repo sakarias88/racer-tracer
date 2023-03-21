@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use minifb::{Key, Window};
+use slog::Logger;
 
 use crate::error::TracerError;
 
@@ -9,13 +10,15 @@ pub type KeyClosure<'a> = &'a (dyn Fn(f64) -> Result<(), TracerError> + Send + S
 pub struct KeyInputs<'a> {
     is_down_callbacks: HashMap<Key, Vec<KeyClosure<'a>>>,
     is_released_callbacks: HashMap<Key, Vec<KeyClosure<'a>>>,
+    log: Logger,
 }
 
 impl<'a> KeyInputs<'a> {
-    pub fn new() -> Self {
+    pub fn new(log: Logger) -> Self {
         KeyInputs {
             is_down_callbacks: HashMap::new(),
             is_released_callbacks: HashMap::new(),
+            log,
         }
     }
 
@@ -39,7 +42,7 @@ impl<'a> KeyInputs<'a> {
             .for_each(|(_key, callbacks)| {
                 callbacks.iter_mut().for_each(|callback| {
                     if let Err(e) = callback(dt) {
-                        println!("Key callback error: {}", e)
+                        error!(self.log, "Key callback error: {}", e);
                     }
                 })
             });
@@ -49,7 +52,7 @@ impl<'a> KeyInputs<'a> {
             .for_each(|(_key, callbacks)| {
                 callbacks.iter_mut().for_each(|callback| {
                     if let Err(e) = callback(dt) {
-                        println!("Key callback error: {}", e)
+                        error!(self.log, "Key callback error: {}", e);
                     }
                 })
             });

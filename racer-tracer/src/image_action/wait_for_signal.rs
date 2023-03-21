@@ -1,8 +1,13 @@
 use std::sync::RwLock;
 
+use slog::Logger;
 use synchronoise::SignalEvent;
 
-use crate::{config::Config, error::TracerError};
+use crate::{
+    config::Config,
+    error::TracerError,
+    terminal::{write_term, Terminal},
+};
 
 use super::ImageAction;
 
@@ -14,9 +19,11 @@ impl ImageAction for WaitForSignal {
         _screen_buffer: &RwLock<Vec<u32>>,
         event: &SignalEvent,
         _config: &Config,
+        _log: Logger,
+        term: &Terminal,
     ) -> Result<(), TracerError> {
         if !event.status() {
-            println!("Press R to resume.");
+            write_term!(term, "Press R to resume.");
             event.wait();
         }
         event.reset();
