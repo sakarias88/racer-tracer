@@ -8,7 +8,7 @@ mod image_action;
 mod key_inputs;
 mod material;
 mod ray;
-mod render;
+mod renderer;
 mod scene;
 mod terminal;
 mod util;
@@ -36,7 +36,10 @@ use structopt::StructOpt;
 use synchronoise::SignalEvent;
 use terminal::Terminal;
 
-use crate::vec3::Vec3;
+use crate::{
+    renderer::{RenderData, Renderer},
+    vec3::Vec3,
+};
 
 use crate::{
     camera::Camera,
@@ -44,13 +47,14 @@ use crate::{
     error::TracerError,
     image_action::ImageAction,
     key_inputs::KeyInputs,
-    render::render,
+    renderer::{cpu::CpuRenderer, cpu_scaled::CpuRendererScaled},
     scene::Scene,
 };
 
 fn run(config: Config, log: Logger, term: Terminal) -> Result<(), TracerError> {
     info!(log, "Starting racer-tracer {}", env!("CARGO_PKG_VERSION"));
-
+    let renderer: &dyn Renderer = &CpuRenderer {} as &dyn Renderer;
+    let renderer_preview: &dyn Renderer = &CpuRendererScaled {} as &dyn Renderer;
     let image = image::Image::new(config.screen.width, config.screen.height);
     let screen_buffer: RwLock<Vec<u32>> = RwLock::new(vec![0; image.width * image.height]);
     let look_from = Vec3::new(13.0, 2.0, 3.0);
@@ -138,42 +142,43 @@ fn run(config: Config, log: Logger, term: Terminal) -> Result<(), TracerError> {
                                 || {
                                     render_image.reset();
                                     // Render preview
-                                    render(
-                                        &screen_buffer,
-                                        &camera,
-                                        &image,
-                                        &scene,
-                                        &config.preview,
-                                        None,
-                                        Some(config.preview.scale),
-                                    )
+                                    renderer_preview.render(RenderData {
+                                        buffer: &screen_buffer,
+                                        camera: &camera,
+                                        image: &image,
+                                        scene: &scene,
+                                        config: &config,
+                                        cancel_event: None,
+                                    })
                                 },
                                 |_| {
                                     render_image.reset();
                                     let render_time = Instant::now();
-                                    render(
-                                        &screen_buffer,
-                                        &camera,
-                                        &image,
-                                        &scene,
-                                        &config.render,
-                                        Some(&render_image),
-                                        None,
-                                    )
-                                    .and_then(|_| {
-                                        info!(
-                                            log,
-                                            "It took {} seconds to render the image.",
-                                            Instant::now().duration_since(render_time).as_secs()
-                                        );
-                                        image_action.action(
-                                            &screen_buffer,
-                                            &render_image,
-                                            &config,
-                                            log.new(o!("scope" => "image-action")),
-                                            &term,
-                                        )
-                                    })
+                                    renderer
+                                        .render(RenderData {
+                                            buffer: &screen_buffer,
+                                            camera: &camera,
+                                            image: &image,
+                                            scene: &scene,
+                                            config: &config,
+                                            cancel_event: Some(&render_image),
+                                        })
+                                        .and_then(|_| {
+                                            info!(
+                                                log,
+                                                "It took {} seconds to render the image.",
+                                                Instant::now()
+                                                    .duration_since(render_time)
+                                                    .as_secs()
+                                            );
+                                            image_action.action(
+                                                &screen_buffer,
+                                                &render_image,
+                                                &config,
+                                                log.new(o!("scope" => "image-action")),
+                                                &term,
+                                            )
+                                        })
                                 },
                             )
                     });
