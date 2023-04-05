@@ -13,7 +13,7 @@ pub struct Screen {
 }
 
 #[derive(Default, Debug, Deserialize)]
-pub struct RenderData {
+pub struct RenderConfigData {
     pub samples: usize,
     pub max_depth: usize,
     pub num_threads_width: usize,
@@ -108,10 +108,10 @@ impl FromStr for ImageAction {
 #[derive(Default, Debug, Deserialize)]
 pub struct Config {
     #[serde(default)]
-    pub preview: RenderData,
+    pub preview: RenderConfigData,
 
     #[serde(default)]
-    pub render: RenderData,
+    pub render: RenderConfigData,
 
     #[serde(default)]
     pub screen: Screen,
