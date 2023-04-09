@@ -5,15 +5,20 @@ use slog::Logger;
 
 use crate::error::TracerError;
 
-pub type KeyClosure<'a> = &'a (dyn Fn(f64) -> Result<(), TracerError> + Send + Sync);
+pub enum KeyEvent {
+    Release,
+    Down,
+}
 
-pub struct KeyInputs<'a> {
-    is_down_callbacks: HashMap<Key, Vec<KeyClosure<'a>>>,
-    is_released_callbacks: HashMap<Key, Vec<KeyClosure<'a>>>,
+type Callback<'func> = Box<dyn Fn(f64) -> Result<(), TracerError> + Send + Sync + 'func>;
+pub type KeyCallback<'func> = (KeyEvent, Key, Callback<'func>);
+pub struct KeyInputs<'func> {
+    is_down_callbacks: HashMap<Key, Vec<Callback<'func>>>,
+    is_released_callbacks: HashMap<Key, Vec<Callback<'func>>>,
     log: Logger,
 }
 
-impl<'a> KeyInputs<'a> {
+impl<'func, 'window> KeyInputs<'func> {
     pub fn new(log: Logger) -> Self {
         KeyInputs {
             is_down_callbacks: HashMap::new(),
@@ -22,35 +27,69 @@ impl<'a> KeyInputs<'a> {
         }
     }
 
-    pub fn release(&mut self, key: Key, closure: KeyClosure<'a>) {
+    pub fn input(
+        event: KeyEvent,
+        key: Key,
+        callback: impl Fn(f64) -> Result<(), TracerError> + Send + Sync + 'func,
+    ) -> KeyCallback<'func> {
+        (event, key, Box::new(callback))
+    }
+
+    pub fn register_inputs(&mut self, inputs: Vec<KeyCallback<'func>>) {
+        inputs.into_iter().for_each(|(ev, key, closure)| match ev {
+            KeyEvent::Release => {
+                let callbacks = self
+                    .is_released_callbacks
+                    .entry(key)
+                    .or_insert_with(Vec::new);
+                callbacks.push(closure);
+            }
+            KeyEvent::Down => {
+                let callbacks = self.is_down_callbacks.entry(key).or_insert_with(Vec::new);
+                callbacks.push(closure);
+            }
+        })
+    }
+
+    #[allow(dead_code)]
+    pub fn release(
+        &mut self,
+        key: Key,
+        closure: impl Fn(f64) -> Result<(), TracerError> + Send + Sync + 'func,
+    ) {
         let callbacks = self
             .is_released_callbacks
             .entry(key)
             .or_insert_with(Vec::new);
-        callbacks.push(closure);
+        callbacks.push(Box::new(closure));
     }
 
-    pub fn down(&mut self, key: Key, closure: KeyClosure<'a>) {
+    #[allow(dead_code)]
+    pub fn down(
+        &mut self,
+        key: Key,
+        closure: impl Fn(f64) -> Result<(), TracerError> + Send + Sync + 'func,
+    ) {
         let callbacks = self.is_down_callbacks.entry(key).or_insert_with(Vec::new);
-        callbacks.push(closure);
+        callbacks.push(Box::new(closure));
     }
 
-    pub fn update(&mut self, window: &Window, dt: f64) {
+    pub fn update(&self, window: &'window Window, dt: f64) {
         self.is_down_callbacks
-            .iter_mut()
+            .iter()
             .filter(|(key, _callbacks)| window.is_key_down(**key))
             .for_each(|(_key, callbacks)| {
-                callbacks.iter_mut().for_each(|callback| {
+                callbacks.iter().for_each(|callback| {
                     if let Err(e) = callback(dt) {
                         error!(self.log, "Key callback error: {}", e);
                     }
                 })
             });
         self.is_released_callbacks
-            .iter_mut()
+            .iter()
             .filter(|(key, _callbacks)| window.is_key_released(**key))
             .for_each(|(_key, callbacks)| {
-                callbacks.iter_mut().for_each(|callback| {
+                callbacks.iter().for_each(|callback| {
                     if let Err(e) = callback(dt) {
                         error!(self.log, "Key callback error: {}", e);
                     }

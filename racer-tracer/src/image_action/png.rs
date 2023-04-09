@@ -14,6 +14,7 @@ impl ImageAction for SavePng {
     fn action(
         &self,
         screen_buffer: &RwLock<Vec<u32>>,
+        _cancel_event: &SignalEvent,
         event: &SignalEvent,
         config: &Config,
         log: Logger,

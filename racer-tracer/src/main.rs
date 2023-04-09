@@ -10,6 +10,7 @@ mod material;
 mod ray;
 mod renderer;
 mod scene;
+mod scene_controller;
 mod terminal;
 mod util;
 mod vec3;
@@ -25,9 +26,7 @@ use std::{
     convert::TryFrom,
     fs::OpenOptions,
     path::Path,
-    sync::RwLock,
     time::{Duration, Instant},
-    vec::Vec,
 };
 
 use minifb::{Key, Window, WindowOptions};
@@ -37,7 +36,7 @@ use synchronoise::SignalEvent;
 use terminal::Terminal;
 
 use crate::{
-    renderer::{RenderData, Renderer},
+    scene_controller::{interactive::InteractiveScene, SceneController, SceneData},
     vec3::Vec3,
 };
 
@@ -45,22 +44,16 @@ use crate::{
     camera::Camera,
     config::{Args, Config},
     error::TracerError,
-    image_action::ImageAction,
     key_inputs::KeyInputs,
-    renderer::{cpu::CpuRenderer, cpu_scaled::CpuRendererScaled},
     scene::Scene,
 };
 
 fn run(config: Config, log: Logger, term: Terminal) -> Result<(), TracerError> {
     info!(log, "Starting racer-tracer {}", env!("CARGO_PKG_VERSION"));
-    let renderer: &dyn Renderer = &CpuRenderer {} as &dyn Renderer;
-    let renderer_preview: &dyn Renderer = &CpuRendererScaled {} as &dyn Renderer;
     let image = image::Image::new(config.screen.width, config.screen.height);
-    let screen_buffer: RwLock<Vec<u32>> = RwLock::new(vec![0; image.width * image.height]);
     let look_from = Vec3::new(13.0, 2.0, 3.0);
     let look_at = Vec3::new(0.0, 0.0, 0.0);
-    let camera_speed = 2.0;
-    let camera = RwLock::new(Camera::new(
+    let camera = Camera::new(
         look_from,
         look_at,
         Vec3::new(0.0, 1.0, 0.0),
@@ -68,120 +61,42 @@ fn run(config: Config, log: Logger, term: Terminal) -> Result<(), TracerError> {
         &image,
         0.1,
         10.0,
-    ));
-
+    );
     let scene = Scene::try_new(&config.loader)?;
-
     let mut window_res: Result<(), TracerError> = Ok(());
     let mut render_res: Result<(), TracerError> = Ok(());
-
-    let render_image = SignalEvent::manual(false);
     let exit = SignalEvent::manual(false);
 
-    let image_action: Box<dyn ImageAction> = (&config.image_action).into();
-
-    // Setting up controls
-    let mut key_inputs = KeyInputs::new(log.new(o!("scope" => "key-intputs")));
-    let render_image_fn = |_| {
-        render_image.signal();
-        Ok(())
+    let scene_controller = {
+        match &config.scene_controller {
+            config::ConfigSceneController::Interactive => {
+                let camera_speed = 0.000002;
+                InteractiveScene::new(
+                    SceneData {
+                        log: log.new(o!("scope" => "scene-controller")),
+                        term,
+                        config: config.clone(),
+                        scene,
+                        camera,
+                        image: image.clone(),
+                    },
+                    camera_speed,
+                )
+            }
+        }
     };
-    key_inputs.release(Key::R, &render_image_fn);
 
-    let go_forward = |dt: f64| {
-        camera
-            .write()
-            .map_err(|e| TracerError::KeyError(e.to_string()))
-            .map(|mut cam| {
-                cam.go_forward(-dt * camera_speed);
-            })
-    };
-    key_inputs.down(Key::W, &go_forward);
-
-    let go_back = |dt: f64| {
-        camera
-            .write()
-            .map_err(|e| TracerError::KeyError(e.to_string()))
-            .map(|mut cam| {
-                cam.go_forward(dt * camera_speed);
-            })
-    };
-    key_inputs.down(Key::S, &go_back);
-
-    let go_left = |dt: f64| {
-        camera
-            .write()
-            .map_err(|e| TracerError::KeyError(e.to_string()))
-            .map(|mut cam| {
-                cam.go_right(-dt * camera_speed);
-            })
-    };
-    key_inputs.down(Key::A, &go_left);
-
-    let go_right = |dt: f64| {
-        camera
-            .write()
-            .map_err(|e| TracerError::KeyError(e.to_string()))
-            .map(|mut cam| {
-                cam.go_right(dt * camera_speed);
-            })
-    };
-    key_inputs.down(Key::D, &go_right);
+    let mut inputs = KeyInputs::new(log.new(o!("scope" => "key-inputs")));
+    inputs.register_inputs(scene_controller.get_inputs());
 
     rayon::scope(|s| {
+        // Render
         s.spawn(|_| {
             while render_res.is_ok() {
                 render_res = (!exit.wait_timeout(Duration::from_secs(0)))
                     .then_some(|| ())
                     .ok_or(TracerError::ExitEvent)
-                    .and_then(|_| {
-                        render_image
-                            .wait_timeout(Duration::from_secs(0))
-                            .then_some(|| ())
-                            .map_or_else(
-                                || {
-                                    render_image.reset();
-                                    // Render preview
-                                    renderer_preview.render(RenderData {
-                                        buffer: &screen_buffer,
-                                        camera: &camera,
-                                        image: &image,
-                                        scene: &scene,
-                                        config: &config,
-                                        cancel_event: None,
-                                    })
-                                },
-                                |_| {
-                                    render_image.reset();
-                                    let render_time = Instant::now();
-                                    renderer
-                                        .render(RenderData {
-                                            buffer: &screen_buffer,
-                                            camera: &camera,
-                                            image: &image,
-                                            scene: &scene,
-                                            config: &config,
-                                            cancel_event: Some(&render_image),
-                                        })
-                                        .and_then(|_| {
-                                            info!(
-                                                log,
-                                                "It took {} seconds to render the image.",
-                                                Instant::now()
-                                                    .duration_since(render_time)
-                                                    .as_secs()
-                                            );
-                                            image_action.action(
-                                                &screen_buffer,
-                                                &render_image,
-                                                &config,
-                                                log.new(o!("scope" => "image-action")),
-                                                &term,
-                                            )
-                                        })
-                                },
-                            )
-                    });
+                    .and_then(|_| scene_controller.render());
             }
 
             if render_res.is_err() {
@@ -189,6 +104,7 @@ fn run(config: Config, log: Logger, term: Terminal) -> Result<(), TracerError> {
             }
         });
 
+        // Update
         s.spawn(|_| {
             window_res = Window::new(
                 "racer-tracer",
@@ -201,27 +117,32 @@ fn run(config: Config, log: Logger, term: Terminal) -> Result<(), TracerError> {
                 window.limit_update_rate(Some(std::time::Duration::from_micros(16600)));
                 window
             })
-            .and_then(|mut window| {
+            .map(|mut window| {
                 let mut t = Instant::now();
-                while window.is_open() && !window.is_key_down(Key::Escape) && !exit.status() {
-                    let dt = t.elapsed().as_micros() as f64 / 1000000.0;
+                while window_res.is_ok()
+                    && window.is_open()
+                    && !window.is_key_down(Key::Escape)
+                    && !exit.status()
+                {
+                    let dt = t.elapsed().as_micros() as f64;
                     t = Instant::now();
-                    key_inputs.update(&window, dt);
-                    // Sleep a bit to not hog the lock on the buffer all the time.
-                    std::thread::sleep(std::time::Duration::from_millis(1));
+                    inputs.update(&window, dt);
 
-                    screen_buffer
-                        .read()
-                        .map_err(|e| TracerError::FailedToUpdateWindow(e.to_string()))
-                        .and_then(|buf| {
-                            window
-                                .update_with_buffer(&buf, image.width, image.height)
-                                .map_err(|e| TracerError::FailedToUpdateWindow(e.to_string()))
-                        })?
+                    window_res =
+                        scene_controller
+                            .get_buffer()
+                            .and_then(|maybe_buf| match maybe_buf {
+                                Some(buf) => window
+                                    .update_with_buffer(&buf, image.width, image.height)
+                                    .map_err(|e| TracerError::FailedToUpdateWindow(e.to_string())),
+                                None => {
+                                    window.update();
+                                    Ok(())
+                                }
+                            });
                 }
                 exit.signal();
-                render_image.signal();
-                Ok(())
+                scene_controller.stop()
             });
         });
     });
@@ -265,7 +186,7 @@ fn main() {
         Err(TracerError::ExitEvent) => {}
         Ok(_) => {}
         Err(e) => {
-            error!(log, "{}", e);
+            error!(log, "Error: {}", e);
             let exit_code = i32::from(e);
             error!(log, "Exiting with: {}", exit_code);
             std::process::exit(exit_code)
