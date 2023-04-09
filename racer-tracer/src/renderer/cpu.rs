@@ -59,6 +59,9 @@ impl CpuRenderer {
                         buf[offset + row * image.screen_width + col] = color;
                     }
                 }
+                if let Some(updated) = rd.buffer_updated {
+                    updated.signal()
+                }
             })
     }
 

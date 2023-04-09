@@ -18,6 +18,7 @@ pub trait ImageAction: Send + Sync {
     fn action(
         &self,
         screen_buffer: &RwLock<Vec<u32>>,
+        cancel_event: &SignalEvent,
         event: &SignalEvent,
         config: &Config,
         log: Logger,
@@ -25,11 +26,11 @@ pub trait ImageAction: Send + Sync {
     ) -> Result<(), TracerError>;
 }
 
-impl From<&CImageAction> for Box<dyn ImageAction> {
+impl From<&CImageAction> for &dyn ImageAction {
     fn from(image_action: &CImageAction) -> Self {
         match image_action {
-            CImageAction::WaitForSignal => Box::new(WaitForSignal {}),
-            CImageAction::SavePng => Box::new(SavePng {}),
+            CImageAction::WaitForSignal => &WaitForSignal {} as &dyn ImageAction,
+            CImageAction::SavePng => &SavePng {} as &dyn ImageAction,
         }
     }
 }

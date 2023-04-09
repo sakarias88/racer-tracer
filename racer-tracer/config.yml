@@ -23,4 +23,4 @@ loader:
 image_output_dir: "../"
 
 image_action:
-  SavePng # (SavePng, WaitForSignal)
+  WaitForSignal # (SavePng, WaitForSignal)

@@ -6,13 +6,13 @@ use structopt::StructOpt;
 
 use crate::error::TracerError;
 
-#[derive(Default, Debug, Deserialize)]
+#[derive(Default, Clone, Debug, Deserialize)]
 pub struct Screen {
     pub height: usize,
     pub width: usize,
 }
 
-#[derive(Default, Debug, Deserialize)]
+#[derive(Default, Clone, Debug, Deserialize)]
 pub struct RenderConfigData {
     pub samples: usize,
     pub max_depth: usize,
@@ -93,6 +93,23 @@ pub enum ImageAction {
     SavePng,
 }
 
+#[derive(StructOpt, Debug, Clone, Deserialize, Default)]
+pub enum ConfigSceneController {
+    #[default]
+    Interactive,
+}
+
+#[derive(StructOpt, Debug, Clone, Deserialize, Default)]
+pub enum Renderer {
+    #[default]
+    Cpu,
+    CpuPreview,
+}
+
+fn default_preview_renderer() -> Renderer {
+    Renderer::CpuPreview
+}
+
 impl FromStr for ImageAction {
     type Err = TracerError;
 
@@ -105,7 +122,7 @@ impl FromStr for ImageAction {
     }
 }
 
-#[derive(Default, Debug, Deserialize)]
+#[derive(Default, Clone, Debug, Deserialize)]
 pub struct Config {
     #[serde(default)]
     pub preview: RenderConfigData,
@@ -124,6 +141,15 @@ pub struct Config {
 
     #[serde(default)]
     pub image_output_dir: Option<PathBuf>,
+
+    #[serde(default)]
+    pub scene_controller: ConfigSceneController,
+
+    #[serde(default)]
+    pub renderer: Renderer,
+
+    #[serde(default = "default_preview_renderer")]
+    pub preview_renderer: Renderer,
 }
 
 impl Config {

@@ -1,4 +1,4 @@
-use std::sync::RwLock;
+use std::{sync::RwLock, time::Duration};
 
 use slog::Logger;
 use synchronoise::SignalEvent;
@@ -17,6 +17,7 @@ impl ImageAction for WaitForSignal {
     fn action(
         &self,
         _screen_buffer: &RwLock<Vec<u32>>,
+        cancel_event: &SignalEvent,
         event: &SignalEvent,
         _config: &Config,
         _log: Logger,
@@ -24,7 +25,7 @@ impl ImageAction for WaitForSignal {
     ) -> Result<(), TracerError> {
         if !event.status() {
             write_term!(term, "Press R to resume.");
-            event.wait();
+            while !event.wait_timeout(Duration::from_secs(1)) && !cancel_event.status() {}
         }
         event.reset();
         Ok(())
