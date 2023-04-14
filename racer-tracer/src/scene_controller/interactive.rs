@@ -13,7 +13,7 @@ use crate::{
     error::TracerError,
     image::Image,
     image_action::ImageAction,
-    key_inputs::{KeyCallback, KeyEvent, KeyInputs},
+    key_inputs::{KeyCallback, KeyEvent, KeyInputs, MouseCallback},
     renderer::{RenderData, Renderer},
     scene::Scene,
     terminal::Terminal,
@@ -25,6 +25,8 @@ pub struct InteractiveScene<'renderer, 'action> {
     screen_buffer: RwLock<Vec<u32>>,
     preview_buffer: RwLock<Vec<u32>>,
     camera_speed: f64,
+    camera_sensitivity: f32,
+    camera_key_sensitivity: f32,
     render_image_event: SignalEvent,
     buffer_updated: SignalEvent,
     stop_event: SignalEvent,
@@ -41,11 +43,13 @@ pub struct InteractiveScene<'renderer, 'action> {
 }
 
 impl<'renderer, 'action> InteractiveScene<'renderer, 'action> {
-    pub fn new(scene_data: SceneData, camera_speed: f64) -> Self {
+    pub fn new(scene_data: SceneData, camera_speed: f64, camera_sensitivity: f32) -> Self {
         Self {
             screen_buffer: RwLock::new(create_screen_buffer(&scene_data.image)),
             preview_buffer: RwLock::new(create_screen_buffer(&scene_data.image)),
             camera_speed,
+            camera_sensitivity,
+            camera_key_sensitivity: camera_sensitivity * 0.0005, // Just scale it for now.
             render_image_event: SignalEvent::manual(false),
             buffer_updated: SignalEvent::manual(false),
             stop_event: SignalEvent::manual(false),
@@ -64,8 +68,40 @@ impl<'renderer, 'action> InteractiveScene<'renderer, 'action> {
 }
 
 impl<'renderer, 'action> SceneController for InteractiveScene<'renderer, 'action> {
-    fn get_inputs(&self) -> Vec<KeyCallback> {
+    fn key_inputs(&self) -> Vec<KeyCallback> {
         vec![
+            KeyInputs::input(KeyEvent::Down, Key::Left, |dt| {
+                self.camera
+                    .write()
+                    .map_err(|e| TracerError::KeyError(e.to_string()))
+                    .map(|mut cam| {
+                        cam.rotate_right(-dt * self.camera_key_sensitivity as f64);
+                    })
+            }),
+            KeyInputs::input(KeyEvent::Down, Key::Right, |dt| {
+                self.camera
+                    .write()
+                    .map_err(|e| TracerError::KeyError(e.to_string()))
+                    .map(|mut cam| {
+                        cam.rotate_right(dt * self.camera_key_sensitivity as f64);
+                    })
+            }),
+            KeyInputs::input(KeyEvent::Down, Key::Up, |dt| {
+                self.camera
+                    .write()
+                    .map_err(|e| TracerError::KeyError(e.to_string()))
+                    .map(|mut cam| {
+                        cam.rotate_up(dt * self.camera_key_sensitivity as f64);
+                    })
+            }),
+            KeyInputs::input(KeyEvent::Down, Key::Down, |dt| {
+                self.camera
+                    .write()
+                    .map_err(|e| TracerError::KeyError(e.to_string()))
+                    .map(|mut cam| {
+                        cam.rotate_up(-dt * self.camera_key_sensitivity as f64);
+                    })
+            }),
             KeyInputs::input(KeyEvent::Release, Key::R, |_| {
                 self.render_image_event.signal();
                 Ok(())
@@ -103,6 +139,20 @@ impl<'renderer, 'action> SceneController for InteractiveScene<'renderer, 'action
                     })
             }),
         ]
+    }
+
+    fn mouse_input(&self) -> Option<MouseCallback> {
+        Some(Box::new(|x, y| {
+            self.camera
+                .write()
+                .map_err(|e| TracerError::KeyError(e.to_string()))
+                .map(|mut cam| {
+                    cam.rotate(
+                        (x * self.camera_sensitivity) as f64,
+                        (y * self.camera_sensitivity) as f64,
+                    )
+                })
+        }))
     }
 
     fn get_buffer(&self) -> Result<Option<Vec<u32>>, TracerError> {

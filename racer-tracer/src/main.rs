@@ -53,6 +53,9 @@ fn run(config: Config, log: Logger, term: Terminal) -> Result<(), TracerError> {
     let image = image::Image::new(config.screen.width, config.screen.height);
     let look_from = Vec3::new(13.0, 2.0, 3.0);
     let look_at = Vec3::new(0.0, 0.0, 0.0);
+    // TODO: Make camera configurable.
+    // pos, look_at, fov, aperture, focus distance.
+    // Also ensure those can be changed during runtime.
     let camera = Camera::new(
         look_from,
         look_at,
@@ -71,6 +74,7 @@ fn run(config: Config, log: Logger, term: Terminal) -> Result<(), TracerError> {
         match &config.scene_controller {
             config::ConfigSceneController::Interactive => {
                 let camera_speed = 0.000002;
+                let camera_sensitivity = 0.001;
                 InteractiveScene::new(
                     SceneData {
                         log: log.new(o!("scope" => "scene-controller")),
@@ -81,13 +85,17 @@ fn run(config: Config, log: Logger, term: Terminal) -> Result<(), TracerError> {
                         image: image.clone(),
                     },
                     camera_speed,
+                    camera_sensitivity,
                 )
             }
         }
     };
 
     let mut inputs = KeyInputs::new(log.new(o!("scope" => "key-inputs")));
-    inputs.register_inputs(scene_controller.get_inputs());
+    inputs.register_inputs(scene_controller.key_inputs());
+    if let Some(mouse_cb) = scene_controller.mouse_input() {
+        inputs.mouse_move(mouse_cb);
+    }
 
     rayon::scope(|s| {
         // Render
@@ -126,7 +134,7 @@ fn run(config: Config, log: Logger, term: Terminal) -> Result<(), TracerError> {
                 {
                     let dt = t.elapsed().as_micros() as f64;
                     t = Instant::now();
-                    inputs.update(&window, dt);
+                    inputs.update(&mut window, dt);
 
                     window_res =
                         scene_controller

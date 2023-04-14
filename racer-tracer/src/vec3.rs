@@ -1,3 +1,6 @@
+//TODO: Replace this with glam.
+use glam::f32::Vec3 as FVec3;
+
 use std::{fmt, ops};
 
 use serde::Deserialize;
@@ -323,6 +326,22 @@ impl fmt::Display for Vec3 {
             )
             .as_str(),
         )
+    }
+}
+
+impl From<FVec3> for Vec3 {
+    fn from(v: FVec3) -> Self {
+        Vec3::new(v.x as f64, v.y as f64, v.z as f64)
+    }
+}
+
+impl From<Vec3> for FVec3 {
+    fn from(v: Vec3) -> Self {
+        FVec3 {
+            x: v.data[0] as f32,
+            y: v.data[1] as f32,
+            z: v.data[2] as f32,
+        }
     }
 }
 
