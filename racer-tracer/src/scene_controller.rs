@@ -3,8 +3,13 @@ pub mod interactive;
 use slog::Logger;
 
 use crate::{
-    camera::Camera, config::Config, error::TracerError, image::Image, key_inputs::KeyCallback,
-    scene::Scene, terminal::Terminal,
+    camera::Camera,
+    config::Config,
+    error::TracerError,
+    image::Image,
+    key_inputs::{KeyCallback, MouseCallback},
+    scene::Scene,
+    terminal::Terminal,
 };
 
 pub fn create_screen_buffer(image: &Image) -> Vec<u32> {
@@ -23,7 +28,9 @@ pub struct SceneData {
 pub trait SceneController: Send + Sync {
     // Return a vector of key callbacks. The provided closure will be
     // called when the corresponding key is release/pressed.
-    fn get_inputs(&self) -> Vec<KeyCallback>;
+    fn key_inputs(&self) -> Vec<KeyCallback>;
+
+    fn mouse_input(&self) -> Option<MouseCallback>;
 
     // Render function
     fn render(&self) -> Result<(), TracerError>;
