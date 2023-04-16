@@ -166,22 +166,33 @@ fn create_log(log_file: &Path) -> Result<Logger, TracerError> {
         })
 }
 
-fn main() {
+// There is a problem with slog where if the log is created in the
+// same scope as where a process::exit is called it won't flush
+// correctly before exiting.
+fn bridge_main(config: Config) -> i32 {
     let log_file = std::env::temp_dir().join("racer-tracer.log");
     let log = create_log(log_file.as_ref()).expect("Expected to be able to create a log");
     let term = Terminal::new(log.new(o!("scope" => "terminal")));
     terminal::write_term!(term, &format!("Log file: {}", log_file.display()));
 
-    match Config::try_from(Args::from_args())
-        .and_then(|config| run(config, log.new(o!("scope" => "run")), term))
-    {
-        Err(TracerError::ExitEvent) => {}
-        Ok(_) => {}
+    match run(config, log.new(o!("scope" => "run")), term) {
+        Err(TracerError::ExitEvent) => 0,
+        Ok(_) => 0,
         Err(e) => {
             error!(log, "Error: {}", e);
             let exit_code = i32::from(e);
             error!(log, "Exiting with: {}", exit_code);
-            std::process::exit(exit_code)
+            exit_code
+        }
+    }
+}
+
+fn main() {
+    match Config::try_from(Args::from_args()).map(bridge_main) {
+        Ok(ec) => std::process::exit(ec),
+        Err(e) => {
+            println!("Failed to parse config file: {}", e);
+            std::process::exit(0)
         }
     }
 }
