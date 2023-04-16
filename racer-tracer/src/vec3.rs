@@ -1,6 +1,3 @@
-//TODO: Replace this with glam.
-use glam::f32::Vec3 as FVec3;
-
 use std::{fmt, ops};
 
 use serde::Deserialize;
@@ -120,6 +117,35 @@ impl Vec3 {
     pub fn near_zero(&self) -> bool {
         let s = 1e-8;
         self.data[0].abs() < s && self.data[1].abs() < s && self.data[2].abs() < s
+    }
+
+    fn hamilton_product(a: [f64; 4], e: [f64; 4]) -> [f64; 4] {
+        [
+            a[0] * e[0] - a[1] * e[1] - a[2] * e[2] - a[3] * e[3],
+            a[0] * e[1] + a[1] * e[0] + a[2] * e[3] - a[3] * e[2],
+            a[0] * e[2] - a[1] * e[3] + a[2] * e[0] + a[3] * e[1],
+            a[0] * e[3] + a[1] * e[2] - a[2] * e[1] + a[3] * e[0],
+        ]
+    }
+
+    fn get_rotation(degrees: f64, axis: &Vec3) -> ([f64; 4], [f64; 4]) {
+        let hd = degrees * 0.5;
+        let rot = [
+            hd.cos(),
+            hd.sin() * *axis.x(),
+            hd.sin() * *axis.y(),
+            hd.sin() * *axis.z(),
+        ];
+        (rot, [rot[0], -rot[1], -rot[2], -rot[3]])
+    }
+
+    pub fn rotate(&mut self, degrees: f64, axis: &Vec3) {
+        let p = [0.0, self.data[0], self.data[1], self.data[2]];
+        let (r, r_neg) = Vec3::get_rotation(degrees, axis);
+        let rpr_neg = Vec3::hamilton_product(Vec3::hamilton_product(r, p), r_neg);
+        self.data[0] = rpr_neg[1];
+        self.data[1] = rpr_neg[2];
+        self.data[2] = rpr_neg[3];
     }
 }
 
@@ -326,22 +352,6 @@ impl fmt::Display for Vec3 {
             )
             .as_str(),
         )
-    }
-}
-
-impl From<FVec3> for Vec3 {
-    fn from(v: FVec3) -> Self {
-        Vec3::new(v.x as f64, v.y as f64, v.z as f64)
-    }
-}
-
-impl From<Vec3> for FVec3 {
-    fn from(v: Vec3) -> Self {
-        FVec3 {
-            x: v.data[0] as f32,
-            y: v.data[1] as f32,
-            z: v.data[2] as f32,
-        }
     }
 }
 

@@ -35,10 +35,7 @@ use structopt::StructOpt;
 use synchronoise::SignalEvent;
 use terminal::Terminal;
 
-use crate::{
-    scene_controller::{interactive::InteractiveScene, SceneController, SceneData},
-    vec3::Vec3,
-};
+use crate::scene_controller::{interactive::InteractiveScene, SceneController, SceneData};
 
 use crate::{
     camera::Camera,
@@ -51,20 +48,7 @@ use crate::{
 fn run(config: Config, log: Logger, term: Terminal) -> Result<(), TracerError> {
     info!(log, "Starting racer-tracer {}", env!("CARGO_PKG_VERSION"));
     let image = image::Image::new(config.screen.width, config.screen.height);
-    let look_from = Vec3::new(13.0, 2.0, 3.0);
-    let look_at = Vec3::new(0.0, 0.0, 0.0);
-    // TODO: Make camera configurable.
-    // pos, look_at, fov, aperture, focus distance.
-    // Also ensure those can be changed during runtime.
-    let camera = Camera::new(
-        look_from,
-        look_at,
-        Vec3::new(0.0, 1.0, 0.0),
-        20.0,
-        &image,
-        0.1,
-        10.0,
-    );
+    let camera = Camera::from((&image, &config.camera));
     let scene = Scene::try_new(&config.loader)?;
     let mut window_res: Result<(), TracerError> = Ok(());
     let mut render_res: Result<(), TracerError> = Ok(());
