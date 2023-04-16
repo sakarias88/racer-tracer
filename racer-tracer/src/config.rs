@@ -4,22 +4,7 @@ use config::File;
 use serde::Deserialize;
 use structopt::StructOpt;
 
-use crate::error::TracerError;
-
-#[derive(Default, Clone, Debug, Deserialize)]
-pub struct Screen {
-    pub height: usize,
-    pub width: usize,
-}
-
-#[derive(Default, Clone, Debug, Deserialize)]
-pub struct RenderConfigData {
-    pub samples: usize,
-    pub max_depth: usize,
-    pub num_threads_width: usize,
-    pub num_threads_height: usize,
-    pub scale: usize,
-}
+use crate::{error::TracerError, vec3::Vec3};
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "racer-tracer")]
@@ -76,6 +61,69 @@ impl TryFrom<Args> for Config {
     }
 }
 
+#[derive(Default, Clone, Debug, Deserialize)]
+pub struct Screen {
+    pub height: usize,
+    pub width: usize,
+}
+
+#[derive(Default, Clone, Debug, Deserialize)]
+pub struct RenderConfigData {
+    pub samples: usize,
+    pub max_depth: usize,
+    pub num_threads_width: usize,
+    pub num_threads_height: usize,
+    pub scale: usize,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct CameraConfig {
+    #[serde(default = "CameraConfig::default_vfov")]
+    pub vfov: f64,
+
+    #[serde(default = "CameraConfig::default_aperture")]
+    pub aperture: f64,
+
+    #[serde(default = "CameraConfig::default_focus_distance")]
+    pub focus_distance: f64,
+
+    #[serde(default = "CameraConfig::default_pos")]
+    pub pos: Vec3,
+
+    #[serde(default)]
+    pub look_at: Vec3,
+}
+
+impl CameraConfig {
+    fn default_vfov() -> f64 {
+        20.0
+    }
+
+    fn default_aperture() -> f64 {
+        0.1
+    }
+
+    fn default_focus_distance() -> f64 {
+        10.0
+    }
+
+    fn default_pos() -> Vec3 {
+        Vec3::new(0.0, 2.0, 10.0)
+    }
+}
+
+impl Default for CameraConfig {
+    fn default() -> Self {
+        Self {
+            vfov: CameraConfig::default_vfov(),
+            aperture: CameraConfig::default_aperture(),
+            focus_distance: CameraConfig::default_focus_distance(),
+            pos: CameraConfig::default_pos(),
+            look_at: Vec3::default(),
+        }
+    }
+}
+
 #[derive(StructOpt, Debug, Clone, Deserialize, Default)]
 pub enum SceneLoader {
     #[default]
@@ -106,7 +154,7 @@ pub enum Renderer {
     CpuPreview,
 }
 
-fn default_preview_renderer() -> Renderer {
+fn default_preview() -> Renderer {
     Renderer::CpuPreview
 }
 
@@ -148,8 +196,11 @@ pub struct Config {
     #[serde(default)]
     pub renderer: Renderer,
 
-    #[serde(default = "default_preview_renderer")]
+    #[serde(default = "default_preview")]
     pub preview_renderer: Renderer,
+
+    #[serde(default)]
+    pub camera: CameraConfig,
 }
 
 impl Config {
