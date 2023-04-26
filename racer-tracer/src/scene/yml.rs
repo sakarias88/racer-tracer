@@ -8,13 +8,14 @@ use serde::Deserialize;
 
 use crate::{
     error::TracerError,
-    geometry::{sphere::Sphere, Hittable},
-    material::{dialectric::Dialectric, lambertian::Lambertian, metal::Metal, SharedMaterial},
+    material::{dialectric::Dialectric, lambertian::Lambertian, metal::Metal, Material},
     scene::SceneLoader,
     vec3::{Color, Vec3},
 };
 
 use config::File;
+
+use super::SceneObject;
 
 pub struct YmlLoader {
     path: PathBuf,
@@ -27,9 +28,8 @@ impl YmlLoader {
 }
 
 impl SceneLoader for YmlLoader {
-    fn load(&self) -> Result<Vec<Box<dyn crate::geometry::Hittable>>, TracerError> {
-        let datta = SceneData::from_file(PathBuf::from(&self.path))?;
-        datta.try_into()
+    fn load(&self) -> Result<Vec<SceneObject>, TracerError> {
+        SceneData::from_file(PathBuf::from(&self.path)).and_then(|data| data.try_into())
     }
 }
 
@@ -76,25 +76,25 @@ impl SceneData {
     }
 }
 
-impl TryInto<Vec<Box<dyn Hittable>>> for SceneData {
+impl TryInto<Vec<SceneObject>> for SceneData {
     type Error = TracerError;
-    fn try_into(self) -> Result<Vec<Box<dyn Hittable>>, TracerError> {
-        let mut materials: HashMap<String, SharedMaterial> = HashMap::new();
+    fn try_into(self) -> Result<Vec<SceneObject>, TracerError> {
+        let mut materials: HashMap<String, Arc<dyn Material>> = HashMap::new();
         self.materials
             .into_iter()
             .for_each(|(id, material)| match material {
                 MaterialData::Lambertian { color } => {
-                    materials.insert(id, Arc::new(Box::new(Lambertian::new(color))));
+                    materials.insert(id, Arc::new(Lambertian::new(color)));
                 }
                 MaterialData::Metal { color, fuzz } => {
-                    materials.insert(id, Arc::new(Box::new(Metal::new(color, fuzz))));
+                    materials.insert(id, Arc::new(Metal::new(color, fuzz)));
                 }
                 MaterialData::Dialectric { refraction_index } => {
-                    materials.insert(id, Arc::new(Box::new(Dialectric::new(refraction_index))));
+                    materials.insert(id, Arc::new(Dialectric::new(refraction_index)));
                 }
             });
 
-        let geometry: Vec<Box<dyn Hittable>> = self
+        let geometry: Vec<SceneObject> = self
             .geometry
             .into_iter()
             .map(|geo| match geo {
@@ -105,11 +105,9 @@ impl TryInto<Vec<Box<dyn Hittable>>> for SceneData {
                 } => materials
                     .get(&material)
                     .ok_or(TracerError::UnknownMaterial(material))
-                    .map(|mat| {
-                        Box::new(Sphere::new(pos, radius, Arc::clone(mat))) as Box<dyn Hittable>
-                    }),
+                    .map(|mat| crate::scene::create_sphere(pos, Arc::clone(mat), radius)),
             })
-            .collect::<Result<Vec<Box<dyn Hittable>>, TracerError>>()?;
+            .collect::<Result<Vec<SceneObject>, TracerError>>()?;
 
         Ok(geometry)
     }

@@ -1,7 +1,10 @@
 #[macro_use]
 mod error;
+mod aabb;
+mod bvh_node;
 mod camera;
 mod config;
+mod data_bus;
 mod geometry;
 mod image;
 mod image_action;
@@ -11,6 +14,7 @@ mod ray;
 mod renderer;
 mod scene;
 mod scene_controller;
+mod shared_scene;
 mod terminal;
 mod util;
 mod vec3;
@@ -35,23 +39,53 @@ use structopt::StructOpt;
 use synchronoise::SignalEvent;
 use terminal::Terminal;
 
-use crate::scene_controller::{interactive::InteractiveScene, SceneController, SceneData};
+use crate::{
+    bvh_node::BoundingVolumeHirearchy,
+    camera::CameraInitData,
+    config::SceneLoader as CLoader,
+    scene::{none::NoneLoader, random::Random, yml::YmlLoader, Scene, SceneLoader},
+    scene_controller::{interactive::InteractiveScene, SceneController},
+    vec3::Vec3,
+};
 
 use crate::{
     camera::Camera,
     config::{Args, Config},
     error::TracerError,
     key_inputs::KeyInputs,
-    scene::Scene,
 };
 
 fn run(config: Config, log: Logger, term: Terminal) -> Result<(), TracerError> {
     info!(log, "Starting racer-tracer {}", env!("CARGO_PKG_VERSION"));
     let image = image::Image::new(config.screen.width, config.screen.height);
-    let camera = Camera::from((&image, &config.camera));
-    let scene = Scene::try_new(&config.loader)?;
-    let mut window_res: Result<(), TracerError> = Ok(());
+    let mut camera = Camera::new(
+        CameraInitData {
+            look_from: config.camera.pos,
+            look_at: config.camera.look_at,
+            scene_up: Vec3::new(0.0, 1.0, 0.0),
+            vfov: config.camera.vfov,
+            aperture: config.camera.aperture,
+            focus_distance: config.camera.focus_distance,
+            aspect_ratio: image.aspect_ratio,
+            time_a: 0.0,
+            time_b: 1.0,
+        },
+        &image,
+    );
+    let mut shared_camera = camera.get_shared_camera();
+
+    let loader = match &config.loader {
+        CLoader::Yml { path } => Box::new(YmlLoader::new(path.clone())) as Box<dyn SceneLoader>,
+        CLoader::Random => Box::new(Random::new()) as Box<dyn SceneLoader>,
+        CLoader::None => Box::new(NoneLoader::new()) as Box<dyn SceneLoader>,
+    };
+
+    let objects = loader.load()?;
+    let mut scene = Scene::new(camera.get_shared_camera(), image.clone(), objects);
+    let (objs, reader) = scene.get_shared_objects();
+    let mut bvh = BoundingVolumeHirearchy::new(objs, reader, 0.0, 1.0);
     let mut render_res: Result<(), TracerError> = Ok(());
+    let mut window_res: Result<(), TracerError> = Ok(());
     let exit = SignalEvent::manual(false);
 
     let scene_controller = {
@@ -60,14 +94,10 @@ fn run(config: Config, log: Logger, term: Terminal) -> Result<(), TracerError> {
                 let camera_speed = 0.000002;
                 let camera_sensitivity = 0.001;
                 InteractiveScene::new(
-                    SceneData {
-                        log: log.new(o!("scope" => "scene-controller")),
-                        term,
-                        config: config.clone(),
-                        scene,
-                        camera,
-                        image: image.clone(),
-                    },
+                    log.new(o!("scope" => "scene-controller")),
+                    term,
+                    config.clone(),
+                    image.clone(),
                     camera_speed,
                     camera_sensitivity,
                 )
@@ -75,11 +105,8 @@ fn run(config: Config, log: Logger, term: Terminal) -> Result<(), TracerError> {
         }
     };
 
-    let mut inputs = KeyInputs::new(log.new(o!("scope" => "key-inputs")));
-    inputs.register_inputs(scene_controller.key_inputs());
-    if let Some(mouse_cb) = scene_controller.mouse_input() {
-        inputs.mouse_move(mouse_cb);
-    }
+    let mut inputs = KeyInputs::new();
+    inputs.register_inputs(scene_controller.register_key_inputs());
 
     rayon::scope(|s| {
         // Render
@@ -88,7 +115,9 @@ fn run(config: Config, log: Logger, term: Terminal) -> Result<(), TracerError> {
                 render_res = (!exit.wait_timeout(Duration::from_secs(0)))
                     .then_some(|| ())
                     .ok_or(TracerError::ExitEvent)
-                    .and_then(|_| scene_controller.render());
+                    .and_then(|_| bvh.update())
+                    .and_then(|_| shared_camera.update())
+                    .and_then(|_| scene_controller.render(&shared_camera, &bvh));
             }
 
             if render_res.is_err() {
@@ -109,34 +138,47 @@ fn run(config: Config, log: Logger, term: Terminal) -> Result<(), TracerError> {
                 window.limit_update_rate(Some(std::time::Duration::from_micros(16600)));
                 window
             })
-            .map(|mut window| {
+            .and_then(|mut window| {
                 let mut t = Instant::now();
-                while window_res.is_ok()
+                let mut res: Result<(), TracerError> = Ok(());
+                while res.is_ok()
                     && window.is_open()
                     && !window.is_key_down(Key::Escape)
                     && !exit.status()
                 {
                     let dt = t.elapsed().as_micros() as f64;
                     t = Instant::now();
-                    inputs.update(&mut window, dt);
-
-                    window_res =
-                        scene_controller
-                            .get_buffer()
-                            .and_then(|maybe_buf| match maybe_buf {
-                                Some(buf) => window
-                                    .update_with_buffer(&buf, image.width, image.height)
-                                    .map_err(|e| TracerError::FailedToUpdateWindow(e.to_string())),
-                                None => {
-                                    window.update();
-                                    Ok(())
-                                }
-                            });
+                    res = inputs
+                        .update(&mut window)
+                        .and_then(|_| scene.update())
+                        .and_then(|_| camera.update())
+                        .and_then(|_| inputs.get_presses())
+                        .and_then(|key_presses| {
+                            scene_controller.update(
+                                dt,
+                                key_presses,
+                                inputs.get_mouse_pos(&mut window),
+                                &mut camera,
+                                &mut scene,
+                            )
+                        })
+                        .and_then(|_| scene_controller.get_buffer())
+                        .and_then(|maybe_buf| match maybe_buf {
+                            Some(buf) => window
+                                .update_with_buffer(&buf, image.width, image.height)
+                                .map_err(|e| TracerError::FailedToUpdateWindow(e.to_string())),
+                            None => {
+                                window.update();
+                                Ok(())
+                            }
+                        });
                 }
+
                 exit.signal();
-                scene_controller.stop()
+                scene_controller.stop();
+                res
             });
-        });
+        })
     });
 
     window_res.and(render_res)
@@ -186,7 +228,6 @@ fn bridge_main(config: Config) -> i32 {
         }
     }
 }
-
 fn main() {
     match Config::try_from(Args::from_args()).map(bridge_main) {
         Ok(ec) => std::process::exit(ec),

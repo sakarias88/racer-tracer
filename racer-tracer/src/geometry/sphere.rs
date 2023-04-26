@@ -1,30 +1,34 @@
 use std::option::Option;
 use std::sync::Arc;
 
-use crate::geometry::{HitRecord, Hittable};
-use crate::material::Material;
+use crate::aabb::Aabb;
+use crate::geometry::HitRecord;
 use crate::ray::Ray;
+use crate::scene::HittableSceneObject;
+use crate::scene::SceneObject;
 use crate::vec3::Vec3;
 
+#[derive(Clone)]
 pub struct Sphere {
-    pos: Vec3,
     radius: f64,
-    material: Arc<Box<dyn Material>>,
+    aabb: Aabb,
 }
 
 impl Sphere {
-    pub fn new(pos: Vec3, radius: f64, material: Arc<Box<dyn Material>>) -> Self {
+    pub fn new(pos: &Vec3, radius: f64) -> Self {
         Self {
-            pos,
             radius,
-            material,
+            aabb: Aabb::new(
+                pos - Vec3::new(radius, radius, radius),
+                pos + Vec3::new(radius, radius, radius),
+            ),
         }
     }
 }
 
-impl Hittable for Sphere {
-    fn hit(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
-        let oc = ray.origin() - self.pos;
+impl HittableSceneObject for Sphere {
+    fn obj_hit(&self, obj: &SceneObject, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
+        let oc = ray.origin() - obj.pos;
         let a = ray.direction().length_squared();
         let half_b = oc.dot(ray.direction());
         let c = oc.length_squared() - self.radius * self.radius;
@@ -47,10 +51,14 @@ impl Hittable for Sphere {
         }
 
         let point = ray.at(root);
-        let outward_normal = (point - self.pos) / self.radius;
+        let outward_normal = (point - obj.pos) / self.radius;
 
-        let mut hit_record = HitRecord::new(point, root, Arc::clone(&self.material));
+        let mut hit_record = HitRecord::new(point, root, Arc::clone(&obj.material));
         hit_record.set_face_normal(ray, outward_normal);
         Some(hit_record)
+    }
+
+    fn bounding_box(&self, _time0: f64, _time1: f64) -> &Aabb {
+        &self.aabb
     }
 }

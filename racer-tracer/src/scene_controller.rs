@@ -1,39 +1,31 @@
 pub mod interactive;
 
-use slog::Logger;
-
 use crate::{
-    camera::Camera,
-    config::Config,
+    camera::{Camera, SharedCamera},
     error::TracerError,
+    geometry::Hittable,
     image::Image,
-    key_inputs::{KeyCallback, MouseCallback},
+    key_inputs::{KeyEvent, ListenKeyEvents, MousePos},
     scene::Scene,
-    terminal::Terminal,
 };
 
 pub fn create_screen_buffer(image: &Image) -> Vec<u32> {
     vec![0; image.width * image.height]
 }
 
-pub struct SceneData {
-    pub log: Logger,
-    pub term: Terminal,
-    pub config: Config,
-    pub scene: Scene,
-    pub camera: Camera,
-    pub image: Image,
-}
-
 pub trait SceneController: Send + Sync {
-    // Return a vector of key callbacks. The provided closure will be
-    // called when the corresponding key is release/pressed.
-    fn key_inputs(&self) -> Vec<KeyCallback>;
-
-    fn mouse_input(&self) -> Option<MouseCallback>;
+    fn update(
+        &self,
+        dt: f64,
+        keys: Vec<KeyEvent>,
+        mouse_pos: Option<MousePos>,
+        camera: &mut Camera,
+        scene: &mut Scene,
+    ) -> Result<(), TracerError>;
+    fn register_key_inputs(&self) -> Vec<ListenKeyEvents>;
 
     // Render function
-    fn render(&self) -> Result<(), TracerError>;
+    fn render(&self, camera: &SharedCamera, scene: &dyn Hittable) -> Result<(), TracerError>;
 
     // Returns the screen buffer produced by the scene controller.
     // Returns None if no new buffer is available
@@ -42,3 +34,5 @@ pub trait SceneController: Send + Sync {
     // Called when the application wants to exit.
     fn stop(&self);
 }
+
+pub trait SceneRenderer: Send + Sync {}

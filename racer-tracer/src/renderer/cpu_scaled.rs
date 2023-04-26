@@ -1,7 +1,7 @@
 use rayon::prelude::*;
 
 use crate::{
-    camera::Camera,
+    camera::{Camera, CameraSharedData},
     error::TracerError,
     image::SubImage,
     renderer::{cpu::CpuRenderer, do_cancel, ray_color, Renderer},
@@ -25,7 +25,7 @@ impl CpuRendererScaled {
     pub fn raytrace(
         &self,
         rd: &RenderData,
-        camera: &Camera,
+        camera_data: &CameraSharedData,
         image: &SubImage,
         scale: (usize, usize),
     ) -> Result<(), TracerError> {
@@ -43,7 +43,7 @@ impl CpuRendererScaled {
                         / (image.screen_height - 1) as f64;
                     colors[row * scaled_width + column].add(ray_color(
                         rd.scene,
-                        &camera.get_ray(u, v),
+                        &Camera::get_ray(camera_data, u, v),
                         rd.config.preview.max_depth,
                     ));
                 }
@@ -99,10 +99,12 @@ impl Renderer for CpuRendererScaled {
             rd.config.preview.scale,
         );
 
-        CpuRenderer::prepare_threads(&rd).and_then(|(cam, images)| {
+        CpuRenderer::prepare_threads(&rd).and_then(|images| {
             images
                 .into_par_iter()
-                .map(|image| self.raytrace(&rd, &cam, &image, (scale_width, scale_height)))
+                .map(|image| {
+                    self.raytrace(&rd, rd.camera_data, &image, (scale_width, scale_height))
+                })
                 .collect::<Result<(), TracerError>>()
         })
     }

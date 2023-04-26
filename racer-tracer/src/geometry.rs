@@ -1,7 +1,9 @@
+pub mod moving_sphere;
 pub mod sphere;
 
 use std::sync::Arc;
 
+use crate::aabb::Aabb;
 use crate::material::Material;
 use crate::ray::Ray;
 use crate::vec3::Vec3;
@@ -11,11 +13,11 @@ pub struct HitRecord {
     pub normal: Vec3,
     pub t: f64,
     pub front_face: bool,
-    pub material: Arc<Box<dyn Material>>,
+    pub material: Arc<dyn Material>,
 }
 
 impl HitRecord {
-    fn new(point: Vec3, t: f64, material: Arc<Box<dyn Material>>) -> Self {
+    fn new(point: Vec3, t: f64, material: Arc<dyn Material>) -> Self {
         Self {
             point,
             normal: Vec3::default(),
@@ -36,6 +38,7 @@ impl HitRecord {
 }
 
 pub trait Hittable: Send + Sync {
-    //pub trait Hittable {
     fn hit(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord>;
+
+    fn bounding_box(&self, time_a: f64, time_b: f64) -> &Aabb;
 }

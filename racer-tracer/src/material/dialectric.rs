@@ -48,6 +48,9 @@ impl Material for Dialectric {
             refract(unit_direction, &rec.normal, refraction_ratio)
         };
 
-        Some((Ray::new(rec.point, direction), Color::new(1.0, 1.0, 1.0)))
+        Some((
+            Ray::new(rec.point, direction, ray.time()),
+            Color::new(1.0, 1.0, 1.0),
+        ))
     }
 }

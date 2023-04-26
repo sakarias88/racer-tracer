@@ -1,9 +1,14 @@
-use std::{fmt, ops};
+use std::{
+    fmt,
+    ops::{self, Index},
+};
 
 use serde::Deserialize;
 
 use crate::util::{random_double, random_double_range};
 
+//https://doc.rust-lang.org/core/arch/x86_64/struct.__m128.html
+//https://doc.rust-lang.org/core/arch/x86_64/fn._mm_mul_ps.html
 #[derive(Default, Clone, Copy, Deserialize)]
 pub struct Vec3 {
     data: [f64; 3],
@@ -146,6 +151,14 @@ impl Vec3 {
         self.data[0] = rpr_neg[1];
         self.data[1] = rpr_neg[2];
         self.data[2] = rpr_neg[3];
+    }
+}
+
+impl Index<usize> for Vec3 {
+    type Output = f64;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.data[index]
     }
 }
 

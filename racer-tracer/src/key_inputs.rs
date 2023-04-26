@@ -1,138 +1,140 @@
-use std::collections::HashMap;
-
 use minifb::{Key, MouseButton, MouseMode, Window};
-use slog::Logger;
 
+use crate::data_bus::{DataBus, DataReader, DataWriter};
 use crate::error::TracerError;
 
+pub enum ListenKeyEvents {
+    Release(Vec<Key>),
+    Down(Vec<Key>),
+    MouseMove(MouseButton),
+}
+
+#[derive(Clone)]
 pub enum KeyEvent {
-    Release,
-    Down,
+    Released(Key),
+    Down(Key),
+    MouseDelta(MouseButton, f64, f64),
 }
 
-type Callback<'func> = Box<dyn Fn(f64) -> Result<(), TracerError> + Send + Sync + 'func>;
-pub type MouseCallback<'func> =
-    Box<dyn Fn(f32, f32) -> Result<(), TracerError> + Send + Sync + 'func>;
-pub type KeyCallback<'func> = (KeyEvent, Key, Callback<'func>);
-pub struct KeyInputs<'func> {
-    is_down_callbacks: HashMap<Key, Vec<Callback<'func>>>,
-    is_released_callbacks: HashMap<Key, Vec<Callback<'func>>>,
-    mouse_move_callbacks: Vec<MouseCallback<'func>>,
-    log: Logger,
-    mouse_x: f32,
-    mouse_y: f32,
+pub struct MousePos {
+    pub x: f64,
+    pub y: f64,
+}
+
+pub struct Mouse {
+    move_on_press: MouseButton,
     mouse_down: bool,
+    delta: MousePos,
 }
 
-impl<'func, 'window> KeyInputs<'func> {
-    pub fn new(log: Logger) -> Self {
-        KeyInputs {
-            is_down_callbacks: HashMap::new(),
-            is_released_callbacks: HashMap::new(),
-            mouse_move_callbacks: Vec::new(),
-            log,
-            mouse_x: 0.0,
-            mouse_y: 0.0,
+impl Mouse {
+    pub fn new(key: MouseButton) -> Self {
+        Self {
+            move_on_press: key,
             mouse_down: false,
+            delta: MousePos { x: 0.0, y: 0.0 },
         }
     }
 
-    pub fn mouse_move(
-        &mut self,
-        callback: impl Fn(f32, f32) -> Result<(), TracerError> + Send + Sync + 'func,
-    ) {
-        self.mouse_move_callbacks.push(Box::new(callback));
-    }
-
-    pub fn input(
-        event: KeyEvent,
-        key: Key,
-        callback: impl Fn(f64) -> Result<(), TracerError> + Send + Sync + 'func,
-    ) -> KeyCallback<'func> {
-        (event, key, Box::new(callback))
-    }
-
-    pub fn register_inputs(&mut self, inputs: Vec<KeyCallback<'func>>) {
-        inputs.into_iter().for_each(|(ev, key, closure)| match ev {
-            KeyEvent::Release => {
-                let callbacks = self
-                    .is_released_callbacks
-                    .entry(key)
-                    .or_insert_with(Vec::new);
-                callbacks.push(closure);
-            }
-            KeyEvent::Down => {
-                let callbacks = self.is_down_callbacks.entry(key).or_insert_with(Vec::new);
-                callbacks.push(closure);
-            }
-        })
-    }
-
-    #[allow(dead_code)]
-    pub fn release(
-        &mut self,
-        key: Key,
-        closure: impl Fn(f64) -> Result<(), TracerError> + Send + Sync + 'func,
-    ) {
-        let callbacks = self
-            .is_released_callbacks
-            .entry(key)
-            .or_insert_with(Vec::new);
-        callbacks.push(Box::new(closure));
-    }
-
-    #[allow(dead_code)]
-    pub fn down(
-        &mut self,
-        key: Key,
-        closure: impl Fn(f64) -> Result<(), TracerError> + Send + Sync + 'func,
-    ) {
-        let callbacks = self.is_down_callbacks.entry(key).or_insert_with(Vec::new);
-        callbacks.push(Box::new(closure));
-    }
-
-    pub fn update(&mut self, window: &'window mut Window, dt: f64) {
-        if window.is_active() {
-            if window.get_mouse_down(MouseButton::Left) {
-                if let Some((x, y)) = window.get_mouse_pos(MouseMode::Pass) {
-                    if !self.mouse_down {
-                        self.mouse_x = x;
-                        self.mouse_y = y;
-                    }
-                    self.mouse_move_callbacks.iter().for_each(|cb| {
-                        if let Err(e) = cb(self.mouse_x - x, self.mouse_y - y) {
-                            error!(self.log, "Mouse callback error: {}", e);
-                        }
-                    });
-                    self.mouse_x = x;
-                    self.mouse_y = y;
+    pub fn update(&mut self, window: &mut Window) -> Option<KeyEvent> {
+        let mut res = None;
+        if window.get_mouse_down(self.move_on_press) {
+            if let Some((x, y)) = window.get_mouse_pos(MouseMode::Pass) {
+                if !self.mouse_down {
+                    self.delta.x = x as f64;
+                    self.delta.y = y as f64;
                 }
+                res = Some(KeyEvent::MouseDelta(
+                    self.move_on_press,
+                    self.delta.x - x as f64,
+                    self.delta.y - y as f64,
+                ));
 
-                self.mouse_down = true;
-            } else {
-                self.mouse_down = false;
+                self.delta.x = x as f64;
+                self.delta.y = y as f64;
             }
 
-            self.is_down_callbacks
+            self.mouse_down = true;
+        } else {
+            self.mouse_down = false;
+        }
+
+        res
+    }
+}
+
+pub struct KeyInputs {
+    bus: DataBus<KeyEvent>,
+    key_writer: DataWriter<KeyEvent>,
+    key_reader: DataReader<KeyEvent>,
+    listen_is_down: Vec<Key>,
+    listen_is_released: Vec<Key>,
+    listen_mouse: Vec<Mouse>,
+}
+
+impl<'window> KeyInputs {
+    pub fn new() -> Self {
+        let mut bus = DataBus::new("key-inputs");
+        KeyInputs {
+            key_reader: bus.get_reader(),
+            key_writer: bus.get_writer(),
+            bus,
+            listen_is_down: vec![],
+            listen_is_released: vec![],
+            listen_mouse: vec![],
+        }
+    }
+
+    pub fn register_inputs(&mut self, inputs: Vec<ListenKeyEvents>) {
+        inputs.into_iter().for_each(|input| match input {
+            ListenKeyEvents::Release(mut keys) => self.listen_is_released.append(&mut keys),
+            ListenKeyEvents::Down(mut keys) => self.listen_is_down.append(&mut keys),
+            ListenKeyEvents::MouseMove(mouse_key) => {
+                self.listen_mouse.push(Mouse::new(mouse_key));
+            }
+        });
+    }
+
+    // This just gets all available presses. If you want to control
+    // how you block etc you will have to use get_key_reader.
+    pub fn get_presses(&mut self) -> Result<Vec<KeyEvent>, TracerError> {
+        self.key_reader.get_messages()
+    }
+
+    #[allow(dead_code)]
+    pub fn get_key_reader(&mut self) -> DataReader<KeyEvent> {
+        self.bus.get_reader()
+    }
+
+    pub fn get_mouse_pos(&self, window: &'window mut Window) -> Option<MousePos> {
+        window
+            .get_mouse_pos(MouseMode::Pass)
+            .map(|(x, y)| MousePos {
+                x: x as f64,
+                y: y as f64,
+            })
+    }
+
+    pub fn update(&mut self, window: &'window mut Window) -> Result<(), TracerError> {
+        self.bus.update()?;
+        if window.is_active() {
+            self.listen_mouse
+                .iter_mut()
+                .map(|mouse| mouse.update(window))
+                .filter(|v| v.is_some())
+                .try_for_each(|v| self.key_writer.write(v.expect("some value to be some")))?;
+
+            self.listen_is_down
                 .iter()
-                .filter(|(key, _callbacks)| window.is_key_down(**key))
-                .for_each(|(_key, callbacks)| {
-                    callbacks.iter().for_each(|callback| {
-                        if let Err(e) = callback(dt) {
-                            error!(self.log, "Key callback error: {}", e);
-                        }
-                    })
-                });
-            self.is_released_callbacks
+                .filter(|key| window.is_key_down(**key))
+                .try_for_each(|key| self.key_writer.write(KeyEvent::Down(*key)))?;
+
+            self.listen_is_released
                 .iter()
-                .filter(|(key, _callbacks)| window.is_key_released(**key))
-                .for_each(|(_key, callbacks)| {
-                    callbacks.iter().for_each(|callback| {
-                        if let Err(e) = callback(dt) {
-                            error!(self.log, "Key callback error: {}", e);
-                        }
-                    })
-                });
+                .filter(|key| window.is_key_released(**key))
+                .try_for_each(|key| self.key_writer.write(KeyEvent::Released(*key)))
+        } else {
+            Ok(())
         }
     }
 }

@@ -15,6 +15,12 @@ impl Image {
     }
 }
 
+impl Image {
+    pub fn screen_to_uv(&self, screen_x: f64, screen_y: f64) -> (f64, f64) {
+        (screen_x / self.width as f64, screen_y / self.height as f64)
+    }
+}
+
 pub struct SubImage {
     pub x: usize,
     pub y: usize,
