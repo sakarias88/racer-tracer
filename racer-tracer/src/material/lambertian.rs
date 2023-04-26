@@ -17,7 +17,7 @@ impl Lambertian {
 impl Material for Lambertian {
     fn scatter(
         &self,
-        _ray: &crate::ray::Ray,
+        ray: &crate::ray::Ray,
         rec: &crate::geometry::HitRecord,
     ) -> Option<(Ray, Color)> {
         let mut scatter_direction = rec.normal + random_unit_vector();
@@ -27,6 +27,9 @@ impl Material for Lambertian {
             scatter_direction = rec.normal;
         }
 
-        Some((Ray::new(rec.point, scatter_direction), self.color))
+        Some((
+            Ray::new(rec.point, scatter_direction, ray.time()),
+            self.color,
+        ))
     }
 }

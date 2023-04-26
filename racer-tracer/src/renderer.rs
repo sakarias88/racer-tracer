@@ -3,7 +3,7 @@ use std::{sync::RwLock, time::Duration};
 use synchronoise::SignalEvent;
 
 use crate::{
-    camera::Camera,
+    camera::CameraSharedData,
     config::{Config, Renderer as ConfigRenderer},
     error::TracerError,
     geometry::Hittable,
@@ -47,7 +47,7 @@ fn ray_color(scene: &dyn Hittable, ray: &Ray, depth: usize) -> Vec3 {
 
 pub struct RenderData<'a> {
     pub buffer: &'a RwLock<Vec<u32>>,
-    pub camera: &'a RwLock<Camera>,
+    pub camera_data: &'a CameraSharedData,
     pub image: &'a Image,
     pub scene: &'a dyn Hittable,
     pub config: &'a Config,

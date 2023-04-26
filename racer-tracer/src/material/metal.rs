@@ -22,7 +22,11 @@ impl Material for Metal {
         rec: &crate::geometry::HitRecord,
     ) -> Option<(Ray, Color)> {
         let reflected = reflect(&ray.direction().unit_vector(), &rec.normal);
-        let scattered = Ray::new(rec.point, reflected + self.fuzz * random_in_unit_sphere());
+        let scattered = Ray::new(
+            rec.point,
+            reflected + self.fuzz * random_in_unit_sphere(),
+            ray.time(),
+        );
 
         if scattered.direction().dot(&rec.normal) < 0.0 {
             None

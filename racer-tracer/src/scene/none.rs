@@ -1,5 +1,7 @@
 use crate::{error::TracerError, scene::SceneLoader};
 
+use super::SceneObject;
+
 pub struct NoneLoader {}
 
 impl NoneLoader {
@@ -9,7 +11,7 @@ impl NoneLoader {
 }
 
 impl SceneLoader for NoneLoader {
-    fn load(&self) -> Result<Vec<Box<dyn crate::geometry::Hittable>>, TracerError> {
+    fn load(&self) -> Result<Vec<SceneObject>, TracerError> {
         Ok(Vec::new())
     }
 }

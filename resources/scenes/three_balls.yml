@@ -48,6 +48,6 @@ geometry:
   - Sphere:
       pos:
         data: [ 1.0, 0.0, -1.0 ]
-      radius: -0.5
+      radius: 0.5
       material: right
 

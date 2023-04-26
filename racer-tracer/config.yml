@@ -1,7 +1,7 @@
 preview:
   samples: 2
   max_depth: 4
-  scale: 2
+  scale: 4
   num_threads_width: 10
   num_threads_height: 10
 
