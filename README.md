@@ -9,12 +9,12 @@ and contributions are still very welcome.
 
 
 ## Using nix
-`nix-shell default.nix`
+`nix develop`
 After that you can do `cargo build`, `cargo run --release` etc.
 
 
 ## Not using nix
-Currently uses rust version 1.65.0(may work on lower versions).
+Currently needs rust version 1.65.0.
 
 On Linux you may need to install these dependencies for the `minifb`
 crate to work.
