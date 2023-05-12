@@ -211,6 +211,14 @@ impl ops::AddAssign<Vec3> for Vec3 {
     }
 }
 
+impl ops::AddAssign<&Vec3> for Vec3 {
+    fn add_assign(&mut self, rhs: &Vec3) {
+        self.data[0] += rhs.data[0];
+        self.data[1] += rhs.data[1];
+        self.data[2] += rhs.data[2];
+    }
+}
+
 fn vec_sub(v1: &[f64; 3], v2: &[f64; 3]) -> Vec3 {
     Vec3::new(v1[0] - v2[0], v1[1] - v2[1], v1[2] - v2[2])
 }

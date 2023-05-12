@@ -19,17 +19,41 @@ use crate::{
 
 pub trait HittableSceneObject: Send + Sync + DynClone {
     fn obj_hit(&self, obj: &SceneObject, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord>;
-    fn bounding_box(&self, _time0: f64, _time1: f64) -> &Aabb;
+    fn create_bounding_box(&self, obj: &PartialSceneObject, time_a: f64, time_b: f64) -> Aabb;
+    fn update_pos(&mut self, pos_delta: &Vec3);
 }
 
 dyn_clone::clone_trait_object!(HittableSceneObject);
 
 #[derive(Clone)]
 pub struct SceneObject {
-    pub pos: Vec3,
-    pub aabb: Aabb,
+    pos: Vec3,
+    aabb: Aabb,
     pub material: Arc<dyn Material>,
     pub hittable: Box<dyn HittableSceneObject>,
+}
+
+#[derive(Clone)]
+pub struct PartialSceneObject {
+    pub pos: Vec3,
+    pub material: Arc<dyn Material>,
+}
+
+impl SceneObject {
+    pub fn set_pos(&mut self, pos: Vec3) {
+        let delta = pos - self.pos;
+        self.pos = pos;
+        self.aabb.update_pos(&delta);
+        self.hittable.update_pos(&delta);
+    }
+
+    pub fn pos(&self) -> Vec3 {
+        self.pos
+    }
+
+    pub fn aabb(&self) -> &Aabb {
+        &self.aabb
+    }
 }
 
 impl Hittable for SceneObject {
@@ -37,18 +61,26 @@ impl Hittable for SceneObject {
         self.hittable.obj_hit(self, ray, t_min, t_max)
     }
 
-    fn bounding_box(&self, time_a: f64, time_b: f64) -> &Aabb {
-        self.hittable.bounding_box(time_a, time_b)
+    fn bounding_box(&self, _time_a: f64, _time_b: f64) -> &Aabb {
+        // TODO: Time
+        &self.aabb
     }
 }
 
 pub fn create_sphere(pos: Vec3, material: Arc<dyn Material>, radius: f64) -> SceneObject {
-    let sphere = Sphere::new(&pos, radius);
-    SceneObject {
-        pos,
-        aabb: sphere.bounding_box(0.0, 0.0).clone(), // TODO: Time
-        material,
-        hittable: Box::new(sphere),
+    let partial = PartialSceneObject { pos, material };
+    let sphere = Sphere::new(radius);
+    (partial, Box::new(sphere) as Box<dyn HittableSceneObject>).into()
+}
+
+impl From<(PartialSceneObject, Box<dyn HittableSceneObject>)> for SceneObject {
+    fn from(v: (PartialSceneObject, Box<dyn HittableSceneObject>)) -> Self {
+        SceneObject {
+            aabb: v.1.create_bounding_box(&v.0, 0.0, 0.0),
+            pos: v.0.pos,
+            material: v.0.material,
+            hittable: v.1,
+        }
     }
 }
 
@@ -60,27 +92,16 @@ pub fn create_movable_sphere(
     time_a: f64,
     time_b: f64,
 ) -> SceneObject {
-    let movable_sphere = MovingSphere::new(pos_a, pos_b, radius, time_a, time_b);
-    SceneObject {
+    let partial = PartialSceneObject {
         pos: pos_a,
-        aabb: movable_sphere.bounding_box(time_a, time_b).clone(),
         material,
-        hittable: Box::new(movable_sphere),
-    }
-}
-
-impl SceneObject {
-    pub fn set_pos(&mut self, pos: Vec3) {
-        self.pos = pos;
-    }
-
-    pub fn pos(&self) -> Vec3 {
-        self.pos
-    }
-
-    pub fn aabb(&self) -> &Aabb {
-        &self.aabb
-    }
+    };
+    let movable_sphere = MovingSphere::new(pos_b, radius, time_a, time_b);
+    (
+        partial,
+        Box::new(movable_sphere) as Box<dyn HittableSceneObject>,
+    )
+        .into()
 }
 
 pub trait SceneLoader: Send + Sync {
@@ -163,6 +184,7 @@ impl Scene {
                 self.selected_object = Some(ObjectCookie { id: k });
             }
         }
+
         self.selected_object
     }
 

@@ -4,7 +4,7 @@ use std::sync::Arc;
 use crate::aabb::Aabb;
 use crate::geometry::HitRecord;
 use crate::ray::Ray;
-use crate::scene::{HittableSceneObject, SceneObject};
+use crate::scene::{HittableSceneObject, PartialSceneObject, SceneObject};
 use crate::vec3::Vec3;
 
 // TODO: I really do not like these moving spheres. They add the time
@@ -16,47 +16,32 @@ use crate::vec3::Vec3;
 // anything. Keeping it for now...
 #[derive(Clone)]
 pub struct MovingSphere {
-    pos_a: Vec3,
     pos_b: Vec3,
     radius: f64,
     time_a: f64,
     time_b: f64,
-    aabb: Aabb,
 }
 
 impl MovingSphere {
-    pub fn new(pos_a: Vec3, pos_b: Vec3, radius: f64, time_a: f64, time_b: f64) -> Self {
+    pub fn new(pos_b: Vec3, radius: f64, time_a: f64, time_b: f64) -> Self {
         Self {
-            pos_a,
             pos_b,
             radius,
             time_a,
             time_b,
-            aabb: (
-                &Aabb::new(
-                    pos_a - Vec3::new(radius, radius, radius),
-                    pos_a + Vec3::new(radius, radius, radius),
-                ),
-                &Aabb::new(
-                    pos_b - Vec3::new(radius, radius, radius),
-                    pos_b + Vec3::new(radius, radius, radius),
-                ),
-            )
-                .into(),
         }
     }
 }
 
 impl MovingSphere {
-    pub fn pos(&self, time: f64) -> Vec3 {
-        self.pos_a
-            + ((time - self.time_a) / (self.time_b - self.time_a)) * (self.pos_b - self.pos_a)
+    pub fn pos(&self, obj: &SceneObject, time: f64) -> Vec3 {
+        obj.pos() + ((time - self.time_a) / (self.time_b - self.time_a)) * (self.pos_b - obj.pos())
     }
 }
 
 impl HittableSceneObject for MovingSphere {
     fn obj_hit(&self, obj: &SceneObject, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
-        let oc = ray.origin() - self.pos(ray.time());
+        let oc = ray.origin() - self.pos(obj, ray.time());
         let a = ray.direction().length_squared();
         let half_b = oc.dot(ray.direction());
         let c = oc.length_squared() - self.radius * self.radius;
@@ -79,14 +64,28 @@ impl HittableSceneObject for MovingSphere {
         }
 
         let point = ray.at(root);
-        let outward_normal = (point - self.pos(ray.time())) / self.radius;
+        let outward_normal = (point - self.pos(obj, ray.time())) / self.radius;
 
         let mut hit_record = HitRecord::new(point, root, Arc::clone(&obj.material));
         hit_record.set_face_normal(ray, outward_normal);
         Some(hit_record)
     }
 
-    fn bounding_box(&self, _time0: f64, _time1: f64) -> &Aabb {
-        &self.aabb
+    fn update_pos(&mut self, pos_delta: &Vec3) {
+        self.pos_b += pos_delta;
+    }
+
+    fn create_bounding_box(&self, obj: &PartialSceneObject, _time0: f64, _time1: f64) -> Aabb {
+        (
+            &Aabb::new(
+                obj.pos - Vec3::new(self.radius, self.radius, self.radius),
+                obj.pos + Vec3::new(self.radius, self.radius, self.radius),
+            ),
+            &Aabb::new(
+                self.pos_b - Vec3::new(self.radius, self.radius, self.radius),
+                self.pos_b + Vec3::new(self.radius, self.radius, self.radius),
+            ),
+        )
+            .into()
     }
 }

@@ -33,6 +33,11 @@ impl Aabb {
         &self.maximum
     }
 
+    pub fn update_pos(&mut self, pos_delta: &Vec3) {
+        self.minimum += pos_delta;
+        self.maximum += pos_delta;
+    }
+
     // Fastest
     pub fn hit(&self, ray: &Ray, t_min: f64, t_max: f64) -> bool {
         for a in 0..3 {

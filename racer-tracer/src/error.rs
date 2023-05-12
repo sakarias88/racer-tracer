@@ -1,5 +1,6 @@
 use thiserror::Error;
 
+// TODO: specify source errors instead of taking in strings for everything
 #[derive(Clone, Error, Debug, PartialEq, Eq)]
 pub enum TracerError {
     #[error("Failed to create window: {0}")]
@@ -43,17 +44,16 @@ pub enum TracerError {
 
     #[error("Failed to recieve data: {0}")]
     SendError(String),
-
     #[error("Action protocol error! Unsupported action for: {0}")]
     ActionProtocolError(String),
 
     #[error("Failed to write data to bus \"{0}\": {1}")]
     BusWriteError(String, String),
 
-    #[error("Failed to write data to bus \"{0}\": {1}")]
+    #[error("Failed to read data from bus \"{0}\": {1}")]
     BusReadError(String, String),
 
-    #[error("Failed to write data to bus: {0}")]
+    #[error("Failed to update databus \"{0}\"")]
     BusUpdateError(String),
 
     #[error("Bus timeout error.")]
