@@ -25,7 +25,12 @@ pub trait SceneController: Send + Sync {
     fn register_key_inputs(&self) -> Vec<ListenKeyEvents>;
 
     // Render function
-    fn render(&self, camera: &SharedCamera, scene: &dyn Hittable) -> Result<(), TracerError>;
+    fn render(
+        &self,
+        scene_changed: bool,
+        camera: &SharedCamera,
+        scene: &dyn Hittable,
+    ) -> Result<(), TracerError>;
 
     // Returns the screen buffer produced by the scene controller.
     // Returns None if no new buffer is available

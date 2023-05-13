@@ -7,6 +7,8 @@ use crate::ray::Ray;
 use crate::scene::{HittableSceneObject, PartialSceneObject, SceneObject};
 use crate::vec3::Vec3;
 
+use super::sphere::Sphere;
+
 // TODO: I really do not like these moving spheres. They add the time
 // functionality which expands throughout the code base. It's sort of
 // a hack to make a still image look like it's moving in the first
@@ -65,8 +67,9 @@ impl HittableSceneObject for MovingSphere {
 
         let point = ray.at(root);
         let outward_normal = (point - self.pos(obj, ray.time())) / self.radius;
+        let (u, v) = Sphere::get_sphere_uv(&point);
 
-        let mut hit_record = HitRecord::new(point, root, Arc::clone(&obj.material));
+        let mut hit_record = HitRecord::new(point, root, Arc::clone(&obj.material), u, v);
         hit_record.set_face_normal(ray, outward_normal);
         Some(hit_record)
     }

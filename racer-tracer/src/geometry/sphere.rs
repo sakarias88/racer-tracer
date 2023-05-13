@@ -18,6 +18,15 @@ impl Sphere {
     pub fn new(radius: f64) -> Self {
         Self { radius }
     }
+
+    pub fn get_sphere_uv(point: &Vec3) -> (f64, f64) {
+        let theta = (-point.y()).acos();
+        let phi = (-point.z()).atan2(*point.x()) + std::f64::consts::PI;
+        (
+            phi / (2.0 * std::f64::consts::PI),
+            theta / std::f64::consts::PI,
+        )
+    }
 }
 
 impl HittableSceneObject for Sphere {
@@ -46,8 +55,9 @@ impl HittableSceneObject for Sphere {
 
         let point = ray.at(root);
         let outward_normal = (point - obj.pos()) / self.radius;
-
-        let mut hit_record = HitRecord::new(point, root, Arc::clone(&obj.material));
+        let (u, v) = Sphere::get_sphere_uv(&outward_normal);
+        //println!("OO{} {}", u, v);
+        let mut hit_record = HitRecord::new(point, root, Arc::clone(&obj.material), u, v);
         hit_record.set_face_normal(ray, outward_normal);
         Some(hit_record)
     }
