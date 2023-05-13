@@ -145,6 +145,7 @@ pub struct BoundingVolumeHirearchy {
     node: Node,
     time_a: f64,
     time_b: f64,
+    changed: bool,
 }
 
 impl BoundingVolumeHirearchy {
@@ -164,29 +165,35 @@ impl BoundingVolumeHirearchy {
             objects,
             time_a,
             time_b,
+            changed: true,
         }
     }
 
+    pub fn changed(&self) -> bool {
+        self.changed
+    }
+
     pub fn update(&mut self) -> Result<(), TracerError> {
-        let mut changed = false;
+        self.changed = false;
         let res = self.reader.get_messages().and_then(|messages| {
-            messages.into_iter().try_for_each(|action| match action {
-                SceneObjectEvent::Remove { id } => {
-                    changed = true;
-                    self.objects.remove(id.id);
-                    Ok(())
-                }
-                SceneObjectEvent::Pos { id, pos } => {
-                    changed = true;
-                    if let Some(obj) = self.objects.get_mut(id.id) {
-                        obj.set_pos(pos);
+            messages.into_iter().try_for_each(|action| {
+                self.changed = true;
+                match action {
+                    SceneObjectEvent::Remove { id } => {
+                        self.objects.remove(id.id);
+                        Ok(())
                     }
-                    Ok(())
+                    SceneObjectEvent::Pos { id, pos } => {
+                        if let Some(obj) = self.objects.get_mut(id.id) {
+                            obj.set_pos(pos);
+                        }
+                        Ok(())
+                    }
                 }
             })
         });
 
-        if changed {
+        if self.changed {
             self.node = Node::build(
                 self.objects.iter().collect::<Vec<&SceneObject>>(),
                 self.time_a,

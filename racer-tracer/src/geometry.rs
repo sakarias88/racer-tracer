@@ -14,16 +14,20 @@ pub struct HitRecord {
     pub t: f64,
     pub front_face: bool,
     pub material: Arc<dyn Material>,
+    pub u: f64,
+    pub v: f64,
 }
 
 impl HitRecord {
-    fn new(point: Vec3, t: f64, material: Arc<dyn Material>) -> Self {
+    fn new(point: Vec3, t: f64, material: Arc<dyn Material>, u: f64, v: f64) -> Self {
         Self {
             point,
             normal: Vec3::default(),
             t,
             front_face: true,
             material,
+            u,
+            v,
         }
     }
 

@@ -1,5 +1,6 @@
 pub mod none;
 pub mod random;
+pub mod two_spheres;
 pub mod yml;
 
 use dyn_clone::DynClone;

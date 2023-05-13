@@ -1,3 +1,6 @@
+// TODO: Add support for textures and other geometry. Can't be
+// bothered to keep the parsing code up to date while developing
+// things that might change.
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
@@ -84,10 +87,10 @@ impl TryInto<Vec<SceneObject>> for SceneData {
             .into_iter()
             .for_each(|(id, material)| match material {
                 MaterialData::Lambertian { color } => {
-                    materials.insert(id, Arc::new(Lambertian::new(color)));
+                    materials.insert(id, Arc::new(Lambertian::new_with_color(color)));
                 }
                 MaterialData::Metal { color, fuzz } => {
-                    materials.insert(id, Arc::new(Metal::new(color, fuzz)));
+                    materials.insert(id, Arc::new(Metal::new_with_color(color, fuzz)));
                 }
                 MaterialData::Dialectric { refraction_index } => {
                     materials.insert(id, Arc::new(Dialectric::new(refraction_index)));

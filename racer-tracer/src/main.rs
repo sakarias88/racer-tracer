@@ -16,6 +16,7 @@ mod scene;
 mod scene_controller;
 mod shared_scene;
 mod terminal;
+mod texture;
 mod util;
 mod vec3;
 
@@ -43,7 +44,10 @@ use crate::{
     bvh_node::BoundingVolumeHirearchy,
     camera::CameraInitData,
     config::SceneLoader as CLoader,
-    scene::{none::NoneLoader, random::Random, yml::YmlLoader, Scene, SceneLoader},
+    scene::{
+        none::NoneLoader, random::Random, two_spheres::TwoSpheres, yml::YmlLoader, Scene,
+        SceneLoader,
+    },
     scene_controller::{interactive::InteractiveScene, SceneController},
     vec3::Vec3,
 };
@@ -78,6 +82,7 @@ fn run(config: Config, log: Logger, term: Terminal) -> Result<(), TracerError> {
         CLoader::Yml { path } => Box::new(YmlLoader::new(path.clone())) as Box<dyn SceneLoader>,
         CLoader::Random => Box::new(Random::new()) as Box<dyn SceneLoader>,
         CLoader::None => Box::new(NoneLoader::new()) as Box<dyn SceneLoader>,
+        CLoader::TwoSpheres => Box::new(TwoSpheres {}) as Box<dyn SceneLoader>,
     };
 
     let objects = loader.load()?;
@@ -111,13 +116,22 @@ fn run(config: Config, log: Logger, term: Terminal) -> Result<(), TracerError> {
     rayon::scope(|s| {
         // Render
         s.spawn(|_| {
+            // Seed the first image
+            render_res = scene_controller.render(true, &shared_camera, &bvh);
+
             while render_res.is_ok() {
                 render_res = (!exit.wait_timeout(Duration::from_secs(0)))
                     .then_some(|| ())
                     .ok_or(TracerError::ExitEvent)
                     .and_then(|_| bvh.update())
                     .and_then(|_| shared_camera.update())
-                    .and_then(|_| scene_controller.render(&shared_camera, &bvh));
+                    .and_then(|_| {
+                        scene_controller.render(
+                            shared_camera.changed() || bvh.changed(),
+                            &shared_camera,
+                            &bvh,
+                        )
+                    });
             }
 
             if render_res.is_err() {

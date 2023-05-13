@@ -1,17 +1,24 @@
+use std::sync::Arc;
+
 use crate::{
     material::Material,
     ray::Ray,
+    texture::{solid_color::SolidColor, Texture},
     vec3::{random_in_unit_sphere, reflect, Color},
 };
 
 pub struct Metal {
-    color: Color,
+    texture: Arc<dyn Texture>,
     fuzz: f64,
 }
 
 impl Metal {
-    pub fn new(color: Color, fuzz: f64) -> Self {
-        Self { color, fuzz }
+    pub fn new(texture: Arc<dyn Texture>, fuzz: f64) -> Self {
+        Self { texture, fuzz }
+    }
+
+    pub fn new_with_color(color: Color, fuzz: f64) -> Self {
+        Self::new(Arc::new(SolidColor::new(color)), fuzz)
     }
 }
 
@@ -31,7 +38,7 @@ impl Material for Metal {
         if scattered.direction().dot(&rec.normal) < 0.0 {
             None
         } else {
-            Some((scattered, self.color))
+            Some((scattered, self.texture.value(rec.u, rec.v, &rec.point)))
         }
     }
 }

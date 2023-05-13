@@ -35,6 +35,8 @@ impl TryFrom<Args> for Config {
             if let Some(scene) = args.scene {
                 if scene == "random" {
                     cfg.loader = SceneLoader::Random;
+                } else if scene == "two-spheres" {
+                    cfg.loader = SceneLoader::TwoSpheres;
                 } else {
                     let path = PathBuf::from(scene);
                     cfg.loader = path
@@ -132,6 +134,7 @@ pub enum SceneLoader {
         path: PathBuf,
     },
     Random,
+    TwoSpheres,
 }
 
 #[derive(StructOpt, Debug, Clone, Deserialize, Default)]

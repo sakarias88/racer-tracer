@@ -1,7 +1,6 @@
 use thiserror::Error;
 
-// TODO: specify source errors instead of taking in strings for everything
-#[derive(Clone, Error, Debug, PartialEq, Eq)]
+#[derive(Error, Debug, PartialEq)]
 pub enum TracerError {
     #[error("Failed to create window: {0}")]
     FailedToCreateWindow(String),
@@ -61,6 +60,9 @@ pub enum TracerError {
 
     #[error("No object with id: {0}.")]
     NoObjectWithId(usize),
+
+    #[error("Failed to open image {0}: {1}")]
+    FailedToOpenImage(String, String),
 }
 
 impl From<TracerError> for i32 {
@@ -86,6 +88,7 @@ impl From<TracerError> for i32 {
             TracerError::BusUpdateError(_) => 18,
             TracerError::BusTimeoutError() => 19,
             TracerError::NoObjectWithId(_) => 20,
+            TracerError::FailedToOpenImage(_, _) => 21,
         }
     }
 }

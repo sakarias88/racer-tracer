@@ -50,6 +50,7 @@ pub enum CameraEvent {
 pub struct SharedCamera {
     reader: DataReader<CameraEvent>,
     data: CameraSharedData,
+    changed: bool,
 }
 
 #[derive(Clone)]
@@ -72,16 +73,26 @@ pub struct CameraSharedData {
 
 impl SharedCamera {
     pub fn new(data: CameraSharedData, reader: DataReader<CameraEvent>) -> Self {
-        Self { reader, data }
+        Self {
+            reader,
+            data,
+            changed: true,
+        }
     }
 
     pub fn data(&self) -> &CameraSharedData {
         &self.data
     }
 
+    pub fn changed(&self) -> bool {
+        self.changed
+    }
+
     pub fn update(&mut self) -> Result<(), TracerError> {
+        self.changed = false;
         self.reader.get_messages().map(|messages| {
             messages.into_iter().for_each(|action| {
+                self.changed = true;
                 match action {
                     CameraEvent::Pos {
                         origin,

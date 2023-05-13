@@ -4,6 +4,7 @@ use crate::{
     error::TracerError,
     material::{dialectric::Dialectric, lambertian::Lambertian, metal::Metal},
     scene::SceneLoader,
+    texture::{checkered::Checkered, solid_color::SolidColor},
     util::{random_double, random_double_range},
     vec3::{Color, Vec3},
 };
@@ -21,7 +22,11 @@ impl Random {
 impl SceneLoader for Random {
     fn load(&self) -> Result<Vec<SceneObject>, TracerError> {
         let mut geometry: Vec<SceneObject> = Vec::new();
-        let ground_material = Arc::new(Lambertian::new(Color::new(0.5, 0.5, 0.5)));
+        let checkered = Arc::new(Checkered::new(
+            Arc::new(SolidColor::new_from_rgb(0.2, 0.3, 0.1)),
+            Arc::new(SolidColor::new_from_rgb(0.9, 0.9, 0.9)),
+        ));
+        let ground_material = Arc::new(Lambertian::new(checkered));
         geometry.push(crate::scene::create_sphere(
             Vec3::new(0.0, -1000.0, 0.0),
             ground_material,
@@ -41,7 +46,7 @@ impl SceneLoader for Random {
                     if choose_mat < 0.8 {
                         // diffuse
                         let albedo = Color::random() * Color::random();
-                        let mat = Arc::new(Lambertian::new(albedo));
+                        let mat = Arc::new(Lambertian::new_with_color(albedo));
                         let center2 = center + Vec3::new(0.0, random_double_range(0.0, 0.5), 0.0);
 
                         geometry.push(crate::scene::create_movable_sphere(
@@ -51,7 +56,7 @@ impl SceneLoader for Random {
                         // metal
                         let albedo = Color::random_range(0.5, 1.0);
                         let fuzz = random_double_range(0.0, 0.5);
-                        let mat = Arc::new(Metal::new(albedo, fuzz));
+                        let mat = Arc::new(Metal::new_with_color(albedo, fuzz));
                         geometry.push(crate::scene::create_sphere(center, mat, 0.2));
                     } else {
                         // glass
@@ -69,14 +74,14 @@ impl SceneLoader for Random {
             1.0,
         ));
 
-        let lamb_mat = Arc::new(Lambertian::new(Color::new(0.4, 0.2, 0.1)));
+        let lamb_mat = Arc::new(Lambertian::new_with_color(Color::new(0.4, 0.2, 0.1)));
         geometry.push(crate::scene::create_sphere(
             Vec3::new(-4.0, 1.0, 0.0),
             lamb_mat,
             1.0,
         ));
 
-        let metal_mat = Arc::new(Metal::new(Color::new(0.7, 0.6, 0.5), 0.0));
+        let metal_mat = Arc::new(Metal::new_with_color(Color::new(0.7, 0.6, 0.5), 0.0));
 
         geometry.push(crate::scene::create_sphere(
             Vec3::new(4.0, 1.0, 0.0),

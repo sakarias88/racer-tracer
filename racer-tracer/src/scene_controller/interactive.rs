@@ -217,7 +217,16 @@ impl<'renderer, 'action> SceneController for InteractiveScene<'renderer, 'action
             })
     }
 
-    fn render(&self, camera: &SharedCamera, scene: &dyn Hittable) -> Result<(), TracerError> {
+    fn render(
+        &self,
+        scene_changed: bool,
+        camera: &SharedCamera,
+        scene: &dyn Hittable,
+    ) -> Result<(), TracerError> {
+        if !scene_changed && !self.render_image_event.status() {
+            return Ok(());
+        }
+
         self.render_image_event
             .wait_timeout(Duration::from_secs(0))
             .then_some(|| ())
