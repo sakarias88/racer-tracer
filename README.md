@@ -19,7 +19,7 @@ Currently needs rust version 1.65.0.
 On Linux you may need to install these dependencies for the `minifb`
 crate to work.
 
-`sudo apt install libxkbcommon-dev libwayland-cursor0 libwayland-dev`
+`sudo apt install libxkbcommon-dev`
 
 
 # Running
