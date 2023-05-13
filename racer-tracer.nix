@@ -4,17 +4,12 @@
 , cacert
 , xorg
 , lib
-, cargo
-, rustc
 , rust
-, rustfmt
-, rust-analyzer
-, clippy
 }:
 stdenv.mkDerivation {
   name = "racer-tracer";
   src = nix-gitignore.gitignoreSource [] ./racer-tracer;
-  nativeBuildInputs = [ cargo rustc cacert xorg.libX11 ];
+  nativeBuildInputs = [ rust cacert ];
 
   configurePhase = ''
     export CARGO_HOME=$PWD
