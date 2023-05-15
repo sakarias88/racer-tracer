@@ -1,3 +1,5 @@
+use serde::Deserialize;
+
 use crate::data_bus::{DataBus, DataReader, DataWriter};
 use crate::error::TracerError;
 use crate::image::Image;
@@ -382,5 +384,89 @@ impl Camera {
         self.data.upper_left_corner = self.data.origin + self.data.vertical / 2.0
             - self.data.horizontal / 2.0
             - self.data.focus_distance * self.data.forward;
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Default)]
+pub struct CameraLoadData {
+    pub vfov: Option<f64>,
+    pub aperture: Option<f64>,
+    pub focus_distance: Option<f64>,
+    pub pos: Option<Vec3>,
+    pub look_at: Option<Vec3>,
+    pub speed: Option<f64>,
+    pub sensitivity: Option<f64>,
+}
+
+pub struct RealizedCameraLoadData {
+    pub vfov: f64,
+    pub aperture: f64,
+    pub focus_distance: f64,
+    pub pos: Vec3,
+    pub look_at: Vec3,
+    pub speed: f64,
+    pub sensitivity: f64,
+}
+
+impl RealizedCameraLoadData {
+    pub fn merge(data1: CameraLoadData, data2: CameraLoadData) -> Self {
+        Self {
+            vfov: data1
+                .vfov
+                .or(data2.vfov)
+                .unwrap_or_else(RealizedCameraLoadData::default_vfov),
+            aperture: data1
+                .aperture
+                .or(data2.aperture)
+                .unwrap_or_else(RealizedCameraLoadData::default_aperture),
+            focus_distance: data1
+                .focus_distance
+                .or(data2.focus_distance)
+                .unwrap_or_else(RealizedCameraLoadData::default_focus_distance),
+            pos: data1
+                .pos
+                .or(data2.pos)
+                .unwrap_or_else(RealizedCameraLoadData::default_pos),
+            look_at: data1
+                .look_at
+                .or(data2.look_at)
+                .unwrap_or_else(RealizedCameraLoadData::default_look_at),
+            speed: data1
+                .speed
+                .or(data2.speed)
+                .unwrap_or_else(RealizedCameraLoadData::default_speed),
+            sensitivity: data1
+                .sensitivity
+                .or(data2.sensitivity)
+                .unwrap_or_else(RealizedCameraLoadData::default_sensitivity),
+        }
+    }
+
+    pub fn default_vfov() -> f64 {
+        20.0
+    }
+
+    pub fn default_aperture() -> f64 {
+        0.0
+    }
+
+    pub fn default_focus_distance() -> f64 {
+        1000.0
+    }
+
+    pub fn default_pos() -> Vec3 {
+        Vec3::new(0.0, 0.0, 0.0)
+    }
+
+    pub fn default_look_at() -> Vec3 {
+        Vec3::new(0.0, 0.0, -1.0)
+    }
+
+    pub fn default_speed() -> f64 {
+        0.0002
+    }
+
+    pub fn default_sensitivity() -> f64 {
+        0.001
     }
 }

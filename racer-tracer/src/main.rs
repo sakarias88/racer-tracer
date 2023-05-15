@@ -1,11 +1,13 @@
 #[macro_use]
 mod error;
 mod aabb;
+mod background_color;
 mod bvh_node;
 mod camera;
 mod config;
 mod data_bus;
 mod geometry;
+mod geometry_creation;
 mod image;
 mod image_action;
 mod key_inputs;
@@ -41,12 +43,12 @@ use synchronoise::SignalEvent;
 use terminal::Terminal;
 
 use crate::{
+    background_color::BackgroundColor,
     bvh_node::BoundingVolumeHirearchy,
-    camera::CameraInitData,
+    camera::{CameraInitData, RealizedCameraLoadData},
     config::SceneLoader as CLoader,
     scene::{
-        none::NoneLoader, random::Random, two_spheres::TwoSpheres, yml::YmlLoader, Scene,
-        SceneLoader,
+        none::NoneLoader, random::Random, sandbox::Sandbox, yml::YmlLoader, Scene, SceneLoader,
     },
     scene_controller::{interactive::InteractiveScene, SceneController},
     vec3::Vec3,
@@ -62,14 +64,27 @@ use crate::{
 fn run(config: Config, log: Logger, term: Terminal) -> Result<(), TracerError> {
     info!(log, "Starting racer-tracer {}", env!("CARGO_PKG_VERSION"));
     let image = image::Image::new(config.screen.width, config.screen.height);
+
+    let loader = match &config.loader {
+        CLoader::Yml { path } => Box::new(YmlLoader::new(path.clone())) as Box<dyn SceneLoader>,
+        CLoader::Random => Box::new(Random::new()) as Box<dyn SceneLoader>,
+        CLoader::None => Box::new(NoneLoader::new()) as Box<dyn SceneLoader>,
+        CLoader::Sandbox => Box::new(Sandbox::new()) as Box<dyn SceneLoader>,
+    };
+
+    let scene_data = loader.load()?;
+    let background = &*scene_data.background as &dyn BackgroundColor;
+
+    let camera_data =
+        RealizedCameraLoadData::merge(scene_data.camera.unwrap_or_default(), config.camera.clone());
     let mut camera = Camera::new(
         CameraInitData {
-            look_from: config.camera.pos,
-            look_at: config.camera.look_at,
+            look_from: camera_data.pos,
+            look_at: camera_data.look_at,
             scene_up: Vec3::new(0.0, 1.0, 0.0),
-            vfov: config.camera.vfov,
-            aperture: config.camera.aperture,
-            focus_distance: config.camera.focus_distance,
+            vfov: camera_data.vfov,
+            aperture: camera_data.aperture,
+            focus_distance: camera_data.focus_distance,
             aspect_ratio: image.aspect_ratio,
             time_a: 0.0,
             time_b: 1.0,
@@ -78,15 +93,11 @@ fn run(config: Config, log: Logger, term: Terminal) -> Result<(), TracerError> {
     );
     let mut shared_camera = camera.get_shared_camera();
 
-    let loader = match &config.loader {
-        CLoader::Yml { path } => Box::new(YmlLoader::new(path.clone())) as Box<dyn SceneLoader>,
-        CLoader::Random => Box::new(Random::new()) as Box<dyn SceneLoader>,
-        CLoader::None => Box::new(NoneLoader::new()) as Box<dyn SceneLoader>,
-        CLoader::TwoSpheres => Box::new(TwoSpheres {}) as Box<dyn SceneLoader>,
-    };
-
-    let objects = loader.load()?;
-    let mut scene = Scene::new(camera.get_shared_camera(), image.clone(), objects);
+    let mut scene = Scene::new(
+        camera.get_shared_camera(),
+        image.clone(),
+        scene_data.objects,
+    );
     let (objs, reader) = scene.get_shared_objects();
     let mut bvh = BoundingVolumeHirearchy::new(objs, reader, 0.0, 1.0);
     let mut render_res: Result<(), TracerError> = Ok(());
@@ -95,18 +106,14 @@ fn run(config: Config, log: Logger, term: Terminal) -> Result<(), TracerError> {
 
     let scene_controller = {
         match &config.scene_controller {
-            config::ConfigSceneController::Interactive => {
-                let camera_speed = 0.000002;
-                let camera_sensitivity = 0.001;
-                InteractiveScene::new(
-                    log.new(o!("scope" => "scene-controller")),
-                    term,
-                    config.clone(),
-                    image.clone(),
-                    camera_speed,
-                    camera_sensitivity,
-                )
-            }
+            config::ConfigSceneController::Interactive => InteractiveScene::new(
+                log.new(o!("scope" => "scene-controller")),
+                term,
+                config.clone(),
+                image.clone(),
+                camera_data.speed,
+                camera_data.sensitivity,
+            ),
         }
     };
 
@@ -117,7 +124,7 @@ fn run(config: Config, log: Logger, term: Terminal) -> Result<(), TracerError> {
         // Render
         s.spawn(|_| {
             // Seed the first image
-            render_res = scene_controller.render(true, &shared_camera, &bvh);
+            render_res = scene_controller.render(true, &shared_camera, &bvh, background);
 
             while render_res.is_ok() {
                 render_res = (!exit.wait_timeout(Duration::from_secs(0)))
@@ -130,6 +137,7 @@ fn run(config: Config, log: Logger, term: Terminal) -> Result<(), TracerError> {
                             shared_camera.changed() || bvh.changed(),
                             &shared_camera,
                             &bvh,
+                            background,
                         )
                     });
             }

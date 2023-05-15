@@ -44,6 +44,7 @@ impl CpuRendererScaled {
                     colors[row * scaled_width + column].add(ray_color(
                         rd.scene,
                         &Camera::get_ray(camera_data, u, v),
+                        rd.background,
                         rd.config.preview.max_depth,
                     ));
                 }

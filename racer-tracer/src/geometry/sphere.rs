@@ -1,11 +1,9 @@
 use std::option::Option;
-use std::sync::Arc;
 
 use crate::aabb::Aabb;
 use crate::geometry::HitRecord;
 use crate::ray::Ray;
 use crate::scene::HittableSceneObject;
-use crate::scene::PartialSceneObject;
 use crate::scene::SceneObject;
 use crate::vec3::Vec3;
 
@@ -56,18 +54,18 @@ impl HittableSceneObject for Sphere {
         let point = ray.at(root);
         let outward_normal = (point - obj.pos()) / self.radius;
         let (u, v) = Sphere::get_sphere_uv(&outward_normal);
-        //println!("OO{} {}", u, v);
-        let mut hit_record = HitRecord::new(point, root, Arc::clone(&obj.material), u, v);
+
+        let mut hit_record = HitRecord::new(point, root, obj.material(), u, v);
         hit_record.set_face_normal(ray, outward_normal);
         Some(hit_record)
     }
 
     fn update_pos(&mut self, _pos_delta: &Vec3) {}
 
-    fn create_bounding_box(&self, obj: &PartialSceneObject, _time0: f64, _time1: f64) -> Aabb {
+    fn create_bounding_box(&self, pos: &Vec3, _time0: f64, _time1: f64) -> Aabb {
         Aabb::new(
-            obj.pos - Vec3::new(self.radius, self.radius, self.radius),
-            obj.pos + Vec3::new(self.radius, self.radius, self.radius),
+            pos - Vec3::new(self.radius, self.radius, self.radius),
+            pos + Vec3::new(self.radius, self.radius, self.radius),
         )
     }
 }

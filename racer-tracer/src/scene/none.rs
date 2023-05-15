@@ -1,6 +1,6 @@
-use crate::{error::TracerError, scene::SceneLoader};
+use crate::{background_color::Sky, error::TracerError, scene::SceneLoader};
 
-use super::SceneObject;
+use super::SceneLoadData;
 
 pub struct NoneLoader {}
 
@@ -11,7 +11,11 @@ impl NoneLoader {
 }
 
 impl SceneLoader for NoneLoader {
-    fn load(&self) -> Result<Vec<SceneObject>, TracerError> {
-        Ok(Vec::new())
+    fn load(&self) -> Result<SceneLoadData, TracerError> {
+        Ok(SceneLoadData {
+            objects: Vec::new(),
+            background: Box::<Sky>::default(),
+            camera: None,
+        })
     }
 }

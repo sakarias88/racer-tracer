@@ -51,3 +51,12 @@ geometry:
       radius: 0.5
       material: right
 
+camera:
+  vfov: 20
+  aperture: 0.1
+  focus_distance: 10
+  pos:
+    data: [ 0, 2, 10 ]
+  look_at:
+    data: [ 0, 0, 0 ]
+  speed: 0.00002

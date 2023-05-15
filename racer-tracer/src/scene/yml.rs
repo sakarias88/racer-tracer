@@ -10,7 +10,10 @@ use std::{
 use serde::Deserialize;
 
 use crate::{
+    background_color::{BackgroundColor, Sky, SolidBackgroundColor},
+    camera::CameraLoadData,
     error::TracerError,
+    geometry_creation::create_sphere,
     material::{dialectric::Dialectric, lambertian::Lambertian, metal::Metal, Material},
     scene::SceneLoader,
     vec3::{Color, Vec3},
@@ -18,7 +21,7 @@ use crate::{
 
 use config::File;
 
-use super::SceneObject;
+use super::{SceneLoadData, SceneObject};
 
 pub struct YmlLoader {
     path: PathBuf,
@@ -31,7 +34,7 @@ impl YmlLoader {
 }
 
 impl SceneLoader for YmlLoader {
-    fn load(&self) -> Result<Vec<SceneObject>, TracerError> {
+    fn load(&self) -> Result<SceneLoadData, TracerError> {
         SceneData::from_file(PathBuf::from(&self.path)).and_then(|data| data.try_into())
     }
 }
@@ -52,10 +55,18 @@ enum GeometryData {
     },
 }
 
+#[derive(Debug, Deserialize)]
+enum Background {
+    Sky { top: Vec3, bottom: Vec3 },
+    SolidColor(Vec3),
+}
+
 #[derive(Deserialize)]
 struct SceneData {
     materials: HashMap<String, MaterialData>,
     geometry: Vec<GeometryData>,
+    background: Option<Background>,
+    camera: Option<CameraLoadData>,
 }
 
 impl SceneData {
@@ -79,9 +90,9 @@ impl SceneData {
     }
 }
 
-impl TryInto<Vec<SceneObject>> for SceneData {
+impl TryInto<SceneLoadData> for SceneData {
     type Error = TracerError;
-    fn try_into(self) -> Result<Vec<SceneObject>, TracerError> {
+    fn try_into(self) -> Result<SceneLoadData, TracerError> {
         let mut materials: HashMap<String, Arc<dyn Material>> = HashMap::new();
         self.materials
             .into_iter()
@@ -108,10 +119,23 @@ impl TryInto<Vec<SceneObject>> for SceneData {
                 } => materials
                     .get(&material)
                     .ok_or(TracerError::UnknownMaterial(material))
-                    .map(|mat| crate::scene::create_sphere(pos, Arc::clone(mat), radius)),
+                    .map(|mat| create_sphere(Arc::clone(mat), pos, radius)),
             })
             .collect::<Result<Vec<SceneObject>, TracerError>>()?;
-
-        Ok(geometry)
+        Ok(SceneLoadData {
+            objects: geometry,
+            background: match self.background {
+                Some(v) => match v {
+                    Background::Sky { top, bottom } => {
+                        Box::new(Sky::new(top, bottom)) as Box<dyn BackgroundColor>
+                    }
+                    Background::SolidColor(color) => {
+                        Box::new(SolidBackgroundColor::new(color)) as Box<dyn BackgroundColor>
+                    }
+                },
+                None => Box::<Sky>::default() as Box<dyn BackgroundColor>,
+            },
+            camera: self.camera,
+        })
     }
 }

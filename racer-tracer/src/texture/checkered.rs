@@ -19,6 +19,7 @@ impl Checkered {
         }
     }
 
+    #[allow(dead_code)]
     pub fn new_with_colors(even: Color, odd: Color) -> Self {
         Self {
             even: Arc::new(SolidColor::new(even)),

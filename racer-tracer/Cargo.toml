@@ -5,7 +5,7 @@ authors = ["Sakarias Johansson <sakarias.johansson@goodbyekansas.com>"]
 edition = "2021"
 
 [dependencies]
-minifb = "0.23"
+minifb = "0.24"
 thiserror = "1"
 futures = "0.3"
 rand = "0.8.5"

@@ -63,6 +63,18 @@ impl Vec3 {
         self.sub(v);
     }
 
+    pub fn min(&mut self, v: &Vec3) {
+        self.data[0] = self.data[0].min(v.data[0]);
+        self.data[1] = self.data[1].min(v.data[1]);
+        self.data[2] = self.data[2].min(v.data[2]);
+    }
+
+    pub fn max(&mut self, v: &Vec3) {
+        self.data[0] = self.data[0].max(v.data[0]);
+        self.data[1] = self.data[1].max(v.data[1]);
+        self.data[2] = self.data[2].max(v.data[2]);
+    }
+
     pub fn unit_vector(mut self) -> Vec3 {
         let len = self.length();
         self.data[0] /= len;
@@ -373,6 +385,12 @@ impl fmt::Display for Vec3 {
             )
             .as_str(),
         )
+    }
+}
+
+impl std::ops::IndexMut<usize> for Vec3 {
+    fn index_mut(&mut self, index: usize) -> &'_ mut Self::Output {
+        &mut self.data[index]
     }
 }
 

@@ -1,6 +1,7 @@
 pub mod interactive;
 
 use crate::{
+    background_color::BackgroundColor,
     camera::{Camera, SharedCamera},
     error::TracerError,
     geometry::Hittable,
@@ -30,6 +31,7 @@ pub trait SceneController: Send + Sync {
         scene_changed: bool,
         camera: &SharedCamera,
         scene: &dyn Hittable,
+        background: &dyn BackgroundColor,
     ) -> Result<(), TracerError>;
 
     // Returns the screen buffer produced by the scene controller.
