@@ -1,7 +1,10 @@
 use std::sync::Arc;
 
 use crate::{
+    background_color::Sky,
+    camera::CameraLoadData,
     error::TracerError,
+    geometry_creation::{create_movable_sphere, create_sphere},
     material::{dialectric::Dialectric, lambertian::Lambertian, metal::Metal},
     scene::SceneLoader,
     texture::{checkered::Checkered, solid_color::SolidColor},
@@ -9,7 +12,7 @@ use crate::{
     vec3::{Color, Vec3},
 };
 
-use super::SceneObject;
+use super::{SceneLoadData, SceneObject};
 
 pub struct Random {}
 
@@ -20,16 +23,16 @@ impl Random {
 }
 
 impl SceneLoader for Random {
-    fn load(&self) -> Result<Vec<SceneObject>, TracerError> {
+    fn load(&self) -> Result<SceneLoadData, TracerError> {
         let mut geometry: Vec<SceneObject> = Vec::new();
         let checkered = Arc::new(Checkered::new(
             Arc::new(SolidColor::new_from_rgb(0.2, 0.3, 0.1)),
             Arc::new(SolidColor::new_from_rgb(0.9, 0.9, 0.9)),
         ));
         let ground_material = Arc::new(Lambertian::new(checkered));
-        geometry.push(crate::scene::create_sphere(
-            Vec3::new(0.0, -1000.0, 0.0),
+        geometry.push(create_sphere(
             ground_material,
+            Vec3::new(0.0, -1000.0, 0.0),
             1000.0,
         ));
 
@@ -49,46 +52,44 @@ impl SceneLoader for Random {
                         let mat = Arc::new(Lambertian::new_with_color(albedo));
                         let center2 = center + Vec3::new(0.0, random_double_range(0.0, 0.5), 0.0);
 
-                        geometry.push(crate::scene::create_movable_sphere(
-                            center, center2, mat, 0.2, 0.0, 1.0,
-                        ));
+                        geometry.push(create_movable_sphere(mat, center, center2, 0.2, 0.0, 1.0));
                     } else if choose_mat > 0.95 {
                         // metal
                         let albedo = Color::random_range(0.5, 1.0);
                         let fuzz = random_double_range(0.0, 0.5);
                         let mat = Arc::new(Metal::new_with_color(albedo, fuzz));
-                        geometry.push(crate::scene::create_sphere(center, mat, 0.2));
+                        geometry.push(create_sphere(mat, center, 0.2));
                     } else {
                         // glass
                         let mat = Arc::new(Dialectric::new(1.5));
-                        geometry.push(crate::scene::create_sphere(center, mat, 0.2));
+                        geometry.push(create_sphere(mat, center, 0.2));
                     }
                 }
             }
         }
 
         let dial_mat = Arc::new(Dialectric::new(1.5));
-        geometry.push(crate::scene::create_sphere(
-            Vec3::new(0.0, 1.0, 0.0),
-            dial_mat,
-            1.0,
-        ));
+        geometry.push(create_sphere(dial_mat, Vec3::new(0.0, 1.0, 0.0), 1.0));
 
         let lamb_mat = Arc::new(Lambertian::new_with_color(Color::new(0.4, 0.2, 0.1)));
-        geometry.push(crate::scene::create_sphere(
-            Vec3::new(-4.0, 1.0, 0.0),
-            lamb_mat,
-            1.0,
-        ));
+        geometry.push(create_sphere(lamb_mat, Vec3::new(-4.0, 1.0, 0.0), 1.0));
 
         let metal_mat = Arc::new(Metal::new_with_color(Color::new(0.7, 0.6, 0.5), 0.0));
 
-        geometry.push(crate::scene::create_sphere(
-            Vec3::new(4.0, 1.0, 0.0),
-            metal_mat,
-            1.0,
-        ));
+        geometry.push(create_sphere(metal_mat, Vec3::new(4.0, 1.0, 0.0), 1.0));
 
-        Ok(geometry)
+        Ok(SceneLoadData {
+            objects: geometry,
+            background: Box::<Sky>::default(),
+            camera: Some(CameraLoadData {
+                vfov: Some(20.0),
+                aperture: Some(0.1),
+                focus_distance: Some(10.0),
+                pos: Some(Vec3::new(0.0, 2.0, 10.0)),
+                look_at: Some(Vec3::new(0.0, 0.0, 0.0)),
+                speed: Some(0.000002),
+                sensitivity: None,
+            }),
+        })
     }
 }

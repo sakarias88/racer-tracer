@@ -1,6 +1,6 @@
 pub mod none;
 pub mod random;
-pub mod two_spheres;
+pub mod sandbox;
 pub mod yml;
 
 use dyn_clone::DynClone;
@@ -8,10 +8,11 @@ use std::sync::Arc;
 
 use crate::{
     aabb::Aabb,
-    camera::{Camera, SharedCamera},
+    background_color::BackgroundColor,
+    camera::{Camera, CameraLoadData, SharedCamera},
     data_bus::{DataBus, DataReader, DataWriter},
     error::TracerError,
-    geometry::{moving_sphere::MovingSphere, sphere::Sphere, HitRecord, Hittable},
+    geometry::{HitRecord, Hittable},
     image::Image,
     material::Material,
     ray::Ray,
@@ -20,7 +21,7 @@ use crate::{
 
 pub trait HittableSceneObject: Send + Sync + DynClone {
     fn obj_hit(&self, obj: &SceneObject, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord>;
-    fn create_bounding_box(&self, obj: &PartialSceneObject, time_a: f64, time_b: f64) -> Aabb;
+    fn create_bounding_box(&self, pos: &Vec3, time_a: f64, time_b: f64) -> Aabb;
     fn update_pos(&mut self, pos_delta: &Vec3);
 }
 
@@ -30,22 +31,38 @@ dyn_clone::clone_trait_object!(HittableSceneObject);
 pub struct SceneObject {
     pos: Vec3,
     aabb: Aabb,
-    pub material: Arc<dyn Material>,
-    pub hittable: Box<dyn HittableSceneObject>,
-}
-
-#[derive(Clone)]
-pub struct PartialSceneObject {
-    pub pos: Vec3,
-    pub material: Arc<dyn Material>,
+    material: Arc<dyn Material>,
+    hittable: Box<dyn HittableSceneObject>,
 }
 
 impl SceneObject {
+    pub fn new(
+        aabb: Aabb,
+        pos: Vec3,
+        material: Arc<dyn Material>,
+        hittable: Box<dyn HittableSceneObject>,
+    ) -> Self {
+        Self {
+            pos,
+            aabb,
+            material,
+            hittable,
+        }
+    }
+
+    pub fn material(&self) -> Arc<dyn Material> {
+        Arc::clone(&self.material)
+    }
+
     pub fn set_pos(&mut self, pos: Vec3) {
         let delta = pos - self.pos;
         self.pos = pos;
         self.aabb.update_pos(&delta);
         self.hittable.update_pos(&delta);
+    }
+
+    pub fn update_pos(&mut self, pos_delta: &Vec3) {
+        self.set_pos(self.pos + *pos_delta)
     }
 
     pub fn pos(&self) -> Vec3 {
@@ -68,45 +85,14 @@ impl Hittable for SceneObject {
     }
 }
 
-pub fn create_sphere(pos: Vec3, material: Arc<dyn Material>, radius: f64) -> SceneObject {
-    let partial = PartialSceneObject { pos, material };
-    let sphere = Sphere::new(radius);
-    (partial, Box::new(sphere) as Box<dyn HittableSceneObject>).into()
-}
-
-impl From<(PartialSceneObject, Box<dyn HittableSceneObject>)> for SceneObject {
-    fn from(v: (PartialSceneObject, Box<dyn HittableSceneObject>)) -> Self {
-        SceneObject {
-            aabb: v.1.create_bounding_box(&v.0, 0.0, 0.0),
-            pos: v.0.pos,
-            material: v.0.material,
-            hittable: v.1,
-        }
-    }
-}
-
-pub fn create_movable_sphere(
-    pos_a: Vec3,
-    pos_b: Vec3,
-    material: Arc<dyn Material>,
-    radius: f64,
-    time_a: f64,
-    time_b: f64,
-) -> SceneObject {
-    let partial = PartialSceneObject {
-        pos: pos_a,
-        material,
-    };
-    let movable_sphere = MovingSphere::new(pos_b, radius, time_a, time_b);
-    (
-        partial,
-        Box::new(movable_sphere) as Box<dyn HittableSceneObject>,
-    )
-        .into()
+pub struct SceneLoadData {
+    pub objects: Vec<SceneObject>,
+    pub background: Box<dyn BackgroundColor>,
+    pub camera: Option<CameraLoadData>,
 }
 
 pub trait SceneLoader: Send + Sync {
-    fn load(&self) -> Result<Vec<SceneObject>, TracerError>;
+    fn load(&self) -> Result<SceneLoadData, TracerError>;
 }
 
 // Ensures objects are synced between update and render.

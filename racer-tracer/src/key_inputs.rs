@@ -44,11 +44,17 @@ impl Mouse {
                     self.delta.x = x as f64;
                     self.delta.y = y as f64;
                 }
-                res = Some(KeyEvent::MouseDelta(
-                    self.move_on_press,
-                    self.delta.x - x as f64,
-                    self.delta.y - y as f64,
-                ));
+
+                // Only send events when there is a diff.
+                if self.delta.x == x as f64 && self.delta.y == y as f64 {
+                    res = None;
+                } else {
+                    res = Some(KeyEvent::MouseDelta(
+                        self.move_on_press,
+                        self.delta.x - x as f64,
+                        self.delta.y - y as f64,
+                    ));
+                }
 
                 self.delta.x = x as f64;
                 self.delta.y = y as f64;

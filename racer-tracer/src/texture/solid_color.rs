@@ -15,6 +15,7 @@ impl SolidColor {
         Self::new(Vec3::new(r, g, b))
     }
 
+    #[allow(dead_code)]
     pub fn color(&self) -> &Color {
         &self.color
     }

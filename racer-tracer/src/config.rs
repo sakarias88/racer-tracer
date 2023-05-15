@@ -4,7 +4,7 @@ use config::File;
 use serde::Deserialize;
 use structopt::StructOpt;
 
-use crate::{error::TracerError, vec3::Vec3};
+use crate::{camera::CameraLoadData, error::TracerError};
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "racer-tracer")]
@@ -35,8 +35,8 @@ impl TryFrom<Args> for Config {
             if let Some(scene) = args.scene {
                 if scene == "random" {
                     cfg.loader = SceneLoader::Random;
-                } else if scene == "two-spheres" {
-                    cfg.loader = SceneLoader::TwoSpheres;
+                } else if scene == "sandbox" {
+                    cfg.loader = SceneLoader::Sandbox;
                 } else {
                     let path = PathBuf::from(scene);
                     cfg.loader = path
@@ -78,54 +78,6 @@ pub struct RenderConfigData {
     pub scale: usize,
 }
 
-#[derive(Clone, Debug, Deserialize)]
-pub struct CameraConfig {
-    #[serde(default = "CameraConfig::default_vfov")]
-    pub vfov: f64,
-
-    #[serde(default = "CameraConfig::default_aperture")]
-    pub aperture: f64,
-
-    #[serde(default = "CameraConfig::default_focus_distance")]
-    pub focus_distance: f64,
-
-    #[serde(default = "CameraConfig::default_pos")]
-    pub pos: Vec3,
-
-    #[serde(default)]
-    pub look_at: Vec3,
-}
-
-impl CameraConfig {
-    fn default_vfov() -> f64 {
-        20.0
-    }
-
-    fn default_aperture() -> f64 {
-        0.1
-    }
-
-    fn default_focus_distance() -> f64 {
-        10.0
-    }
-
-    fn default_pos() -> Vec3 {
-        Vec3::new(0.0, 2.0, 10.0)
-    }
-}
-
-impl Default for CameraConfig {
-    fn default() -> Self {
-        Self {
-            vfov: CameraConfig::default_vfov(),
-            aperture: CameraConfig::default_aperture(),
-            focus_distance: CameraConfig::default_focus_distance(),
-            pos: CameraConfig::default_pos(),
-            look_at: Vec3::default(),
-        }
-    }
-}
-
 #[derive(StructOpt, Debug, Clone, Deserialize, Default)]
 pub enum SceneLoader {
     #[default]
@@ -134,7 +86,7 @@ pub enum SceneLoader {
         path: PathBuf,
     },
     Random,
-    TwoSpheres,
+    Sandbox,
 }
 
 #[derive(StructOpt, Debug, Clone, Deserialize, Default)]
@@ -203,7 +155,7 @@ pub struct Config {
     pub preview_renderer: Renderer,
 
     #[serde(default)]
-    pub camera: CameraConfig,
+    pub camera: CameraLoadData,
 }
 
 impl Config {

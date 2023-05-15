@@ -8,6 +8,7 @@ use slog::Logger;
 use synchronoise::SignalEvent;
 
 use crate::{
+    background_color::BackgroundColor,
     camera::{Camera, SharedCamera},
     config::Config,
     error::TracerError,
@@ -222,6 +223,7 @@ impl<'renderer, 'action> SceneController for InteractiveScene<'renderer, 'action
         scene_changed: bool,
         camera: &SharedCamera,
         scene: &dyn Hittable,
+        background: &dyn BackgroundColor,
     ) -> Result<(), TracerError> {
         if !scene_changed && !self.render_image_event.status() {
             return Ok(());
@@ -243,6 +245,7 @@ impl<'renderer, 'action> SceneController for InteractiveScene<'renderer, 'action
                             camera_data: camera.data(),
                             image: &self.image,
                             scene,
+                            background,
                             config: &self.config,
                             cancel_event: None,
                             buffer_updated: None,
@@ -282,6 +285,7 @@ impl<'renderer, 'action> SceneController for InteractiveScene<'renderer, 'action
                             camera_data: camera.data(),
                             image: &self.image,
                             scene,
+                            background,
                             config: &self.config,
                             cancel_event: Some(&self.render_image_event),
                             buffer_updated: Some(&self.buffer_updated),
