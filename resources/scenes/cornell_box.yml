@@ -1,0 +1,106 @@
+textures:
+  green:
+    SolidColor:
+        color:
+          color: [ 0.12, 0.45, 0.15 ]
+
+  red:
+    SolidColor:
+        color:
+          color: [ 0.65, 0.05, 0.05 ]
+
+  white:
+    SolidColor:
+        color:
+          color: [ 0.63, 0.63, 0.63 ]
+
+  light:
+    SolidColor:
+        color:
+          color: [ 15, 15, 15 ]
+
+materials:
+  green:
+    Lambertian:
+      texture: green
+
+  red:
+    Lambertian:
+      texture: red
+
+  white:
+    Lambertian:
+      texture: white
+
+  light:
+    DiffuseLight:
+      texture: light
+
+geometry:
+  piece_1:
+    YzRect:
+      y0: 0
+      y1: 555
+      z0: 0
+      z1: 555
+      k: 555
+      material: green
+
+  piece_2:
+    YzRect:
+      y0: 0
+      y1: 555
+      z0: 0
+      z1: 555
+      k: 0
+      material: red
+
+  piece_3:
+    XzRect:
+      x0: 0
+      x1: 555
+      z0: 0
+      z1: 555
+      k: 0
+      material: white
+
+  piece_4:
+    XzRect:
+      x0: 0
+      x1: 555
+      z0: 0
+      z1: 555
+      k: 555
+      material: white
+
+  piece_5:
+    XyRect:
+      x0: 0
+      x1: 555
+      y0: 0
+      y1: 555
+      k: 555
+      material: white
+
+  light:
+    XzRect:
+      x0: 213
+      x1: 343
+      z0: 227
+      z1: 332
+      k: 554
+      material: light
+
+background:
+  SolidColor:
+    pos: [ 0.0, 0.0, 0.0 ]
+
+camera:
+  vfov: 40
+  aperture: 0.0
+  focus_distance: 10000
+  pos:
+    pos: [ 278, 278, -800 ]
+  look_at:
+    pos: [ 278, 278, 0 ]
+

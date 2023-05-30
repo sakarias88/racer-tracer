@@ -1,25 +1,34 @@
 ---
+textures:
+  blue:
+    SolidColor:
+        color:
+          color: [ 0.0, 0.0, 1.0 ]
+
+  red:
+    SolidColor:
+      color:
+        color: [ 1.0, 0.0, 0.0 ]
+
 materials:
   left:
     Lambertian:
-      color:
-        data: [ 0.0, 0.0, 1.0 ]
+      texture: blue
 
   right:
     Lambertian:
-      color:
-        data: [ 1.0, 0.0, 0.0 ]
+        texture: red
 
 geometry:
-  - Sphere:
-      pos:
-        data: [ -0.707, 0.0, -1.0 ]
+  SphereA:
+    Sphere:
+      pos: [ -0.707, 0.0, -1.0 ]
       radius: 0.707
       material: left
 
-  - Sphere:
-      pos:
-        data: [ 0.707, 0.0, -1.0 ]
+  SphereB:
+    Sphere:
+      pos: [ 0.707, 0.0, -1.0 ]
       radius: 0.707
       material: right
 
@@ -28,7 +37,7 @@ camera:
   aperture: 0.1
   focus_distance: 10
   pos:
-    data: [ 0, 2, 10 ]
+    pos: [ 0, 2, 10 ]
   look_at:
-    data: [ 0, 0, 0 ]
+    pos: [ 0, 0, 0 ]
   speed: 0.00002

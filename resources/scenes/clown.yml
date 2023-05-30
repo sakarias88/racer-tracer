@@ -1,0 +1,198 @@
+textures:
+  skin:
+    SolidColor:
+        color:
+          color: [ 0.94, 0.92, 0.84 ]
+
+  white:
+    SolidColor:
+      color:
+        color: [ 1.0, 1.0, 1.0 ]
+
+  black:
+    SolidColor:
+      color:
+        color: [ 0.0, 0.0, 0.0 ]
+
+  red:
+    SolidColor:
+      color:
+        color: [ 0.9, 0.16, 0.08 ]
+
+  eyeliner:
+    SolidColor:
+      color:
+        color: [ 0.1, 0.37, 0.54 ]
+
+materials:
+  skin:
+    Lambertian:
+      texture: skin
+
+  white:
+    Lambertian:
+        texture: white
+
+  black:
+    Metal:
+        texture: black
+        fuzz: 0.2
+
+  red:
+    Metal:
+        texture: red
+        fuzz: 0.2
+
+  eyeliner:
+    Lambertian:
+        texture: eyeliner
+
+geometry:
+  face:
+    Sphere:
+      pos: [ 0, 300.0, 0.0 ]
+      radius: 150
+      material: skin
+
+  nose:
+    Sphere:
+      pos: [ 0, 270.0, -150.0 ]
+      radius: 20
+      material: red
+
+  mid_mouth:
+    Sphere:
+      pos: [ 0, 178.0, -100.0 ]
+      radius: 20
+      material: red
+
+  l_eyeliner:
+    Sphere:
+      pos: [ 55, 310.0, -140.0 ]
+      radius: 35
+      material: eyeliner
+
+  l_eye:
+    Sphere:
+      pos: [ 55, 310.0, -160.0 ]
+      radius: 30
+      material: white
+
+  l_pupil:
+    Sphere:
+      pos: [ 55, 310.0, -190.0 ]
+      radius: 10
+      material: black
+
+  l_hair1:
+    Sphere:
+      pos: [ 130, 310.0, -40.0 ]
+      radius: 40
+      material: red
+
+  l_hair2:
+    Sphere:
+      pos: [ 110, 360.0, -40.0 ]
+      radius: 55
+      material: red
+
+  l_hair3:
+    Sphere:
+      pos: [ 70, 400.0, -40.0 ]
+      radius: 40
+      material: red
+
+  l_mouth1:
+    Sphere:
+      pos: [ 80, 205.0, -100.0 ]
+      radius: 20
+      material: red
+
+  l_mouth2:
+    Sphere:
+      pos: [ 60, 195.0, -105.0 ]
+      radius: 20
+      material: red
+
+  l_mouth3:
+    Sphere:
+      pos: [ 40, 185.0, -102.0 ]
+      radius: 20
+      material: red
+
+  l_mouth4:
+    Sphere:
+      pos: [ 25, 180.0, -100.0 ]
+      radius: 20
+      material: red
+
+  r_eyeliner:
+    Sphere:
+      pos: [ -55, 310.0, -140.0 ]
+      radius: 35
+      material: eyeliner
+
+  r_eye:
+    Sphere:
+      pos: [ -55, 310.0, -160.0 ]
+      radius: 30
+      material: white
+
+  r_pupil:
+    Sphere:
+      pos: [ -55, 310.0, -190.0 ]
+      radius: 10
+      material: black
+
+  r_hair1:
+    Sphere:
+      pos: [ -130, 310.0, -40.0 ]
+      radius: 40
+      material: red
+
+  r_hair2:
+    Sphere:
+      pos: [ -110, 360.0, -40.0 ]
+      radius: 55
+      material: red
+
+  r_hair3:
+    Sphere:
+      pos: [ -70, 400.0, -40.0 ]
+      radius: 40
+      material: red
+
+  r_mouth1:
+    Sphere:
+      pos: [ -80, 205.0, -100.0 ]
+      radius: 20
+      material: red
+
+  r_mouth2:
+    Sphere:
+      pos: [ -60, 195.0, -105.0 ]
+      radius: 20
+      material: red
+
+  r_mouth3:
+    Sphere:
+      pos: [ -40, 185.0, -102.0 ]
+      radius: 20
+      material: red
+
+  r_mouth4:
+    Sphere:
+      pos: [ -25, 180.0, -100.0 ]
+      radius: 20
+      material: red
+
+
+camera:
+  vfov: 40
+  aperture: 0.0
+  focus_distance: 10000
+  pos:
+    pos: [ 0, 278, -800 ]
+  look_at:
+    pos: [ 0, 278, 0 ]
+  speed: 0.002

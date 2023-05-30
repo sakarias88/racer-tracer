@@ -17,9 +17,9 @@ camera:
   aperture: 0.0
   focus_distance: 10000
   pos:
-    data: [ 278, 278, -800 ]
+    pos: [ 278, 278, -800 ]
   look_at:
-    data: [ 278, 278, 0 ]
+    pos: [ 278, 278, 0 ]
 
 screen:
   width: 600

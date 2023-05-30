@@ -11,50 +11,51 @@ use crate::util::{random_double, random_double_range};
 //https://doc.rust-lang.org/core/arch/x86_64/fn._mm_mul_ps.html
 #[derive(Default, Clone, Copy, Deserialize)]
 pub struct Vec3 {
-    data: [f64; 3],
+    #[serde(alias = "color")]
+    pos: [f64; 3],
 }
 
 pub type Color = Vec3;
 
 impl Vec3 {
     pub fn new(x: f64, y: f64, z: f64) -> Vec3 {
-        Vec3 { data: [x, y, z] }
+        Vec3 { pos: [x, y, z] }
     }
 
     pub fn x(&self) -> &f64 {
-        &self.data[0]
+        &self.pos[0]
     }
 
     pub fn y(&self) -> &f64 {
-        &self.data[1]
+        &self.pos[1]
     }
 
     pub fn z(&self) -> &f64 {
-        &self.data[2]
+        &self.pos[2]
     }
 
     pub fn add(&mut self, v: Vec3) {
-        self.data[0] += v.data[0];
-        self.data[1] += v.data[1];
-        self.data[2] += v.data[2];
+        self.pos[0] += v.pos[0];
+        self.pos[1] += v.pos[1];
+        self.pos[2] += v.pos[2];
     }
 
     pub fn sub(&mut self, v: Vec3) {
-        self.data[0] -= v.data[0];
-        self.data[1] -= v.data[1];
-        self.data[2] -= v.data[2];
+        self.pos[0] -= v.pos[0];
+        self.pos[1] -= v.pos[1];
+        self.pos[2] -= v.pos[2];
     }
 
     pub fn div(&mut self, v: f64) {
-        self.data[0] /= v;
-        self.data[1] /= v;
-        self.data[2] /= v;
+        self.pos[0] /= v;
+        self.pos[1] /= v;
+        self.pos[2] /= v;
     }
 
     pub fn mul(&mut self, v: f64) {
-        self.data[0] *= v;
-        self.data[1] *= v;
-        self.data[2] *= v;
+        self.pos[0] *= v;
+        self.pos[1] *= v;
+        self.pos[2] *= v;
     }
 
     pub fn reflect(&mut self, mut v: Vec3) {
@@ -64,22 +65,22 @@ impl Vec3 {
     }
 
     pub fn min(&mut self, v: &Vec3) {
-        self.data[0] = self.data[0].min(v.data[0]);
-        self.data[1] = self.data[1].min(v.data[1]);
-        self.data[2] = self.data[2].min(v.data[2]);
+        self.pos[0] = self.pos[0].min(v.pos[0]);
+        self.pos[1] = self.pos[1].min(v.pos[1]);
+        self.pos[2] = self.pos[2].min(v.pos[2]);
     }
 
     pub fn max(&mut self, v: &Vec3) {
-        self.data[0] = self.data[0].max(v.data[0]);
-        self.data[1] = self.data[1].max(v.data[1]);
-        self.data[2] = self.data[2].max(v.data[2]);
+        self.pos[0] = self.pos[0].max(v.pos[0]);
+        self.pos[1] = self.pos[1].max(v.pos[1]);
+        self.pos[2] = self.pos[2].max(v.pos[2]);
     }
 
     pub fn unit_vector(mut self) -> Vec3 {
         let len = self.length();
-        self.data[0] /= len;
-        self.data[1] /= len;
-        self.data[2] /= len;
+        self.pos[0] /= len;
+        self.pos[1] /= len;
+        self.pos[2] /= len;
         self
     }
 
@@ -88,7 +89,7 @@ impl Vec3 {
     }
 
     pub fn length_squared(&self) -> f64 {
-        self.data[0] * self.data[0] + self.data[1] * self.data[1] + self.data[2] * self.data[2]
+        self.pos[0] * self.pos[0] + self.pos[1] * self.pos[1] + self.pos[2] * self.pos[2]
     }
 
     pub fn dot(&self, v: &Vec3) -> f64 {
@@ -100,22 +101,22 @@ impl Vec3 {
     }
 
     pub fn as_color(&self) -> u32 {
-        let red: u32 = (self.data[0] * 255.0) as u32;
-        let green: u32 = (self.data[1] * 255.0) as u32;
-        let blue: u32 = (self.data[2] * 255.0) as u32;
+        let red: u32 = (self.pos[0] * 255.0) as u32;
+        let green: u32 = (self.pos[1] * 255.0) as u32;
+        let blue: u32 = (self.pos[2] * 255.0) as u32;
         // XRGB
         (255 << 24) | (red << 16) | green << 8 | blue
     }
 
     pub fn random() -> Self {
         Vec3 {
-            data: [random_double(), random_double(), random_double()],
+            pos: [random_double(), random_double(), random_double()],
         }
     }
 
     pub fn random_range(min: f64, max: f64) -> Self {
         Vec3 {
-            data: [
+            pos: [
                 random_double_range(min, max),
                 random_double_range(min, max),
                 random_double_range(min, max),
@@ -125,15 +126,15 @@ impl Vec3 {
 
     pub fn scale_sqrt(mut self, samples: usize) -> Vec3 {
         let scale = 1.0 / samples as f64;
-        self.data[0] = (scale * self.data[0]).sqrt();
-        self.data[1] = (scale * self.data[1]).sqrt();
-        self.data[2] = (scale * self.data[2]).sqrt();
+        self.pos[0] = (scale * self.pos[0]).sqrt();
+        self.pos[1] = (scale * self.pos[1]).sqrt();
+        self.pos[2] = (scale * self.pos[2]).sqrt();
         self
     }
 
     pub fn near_zero(&self) -> bool {
         let s = 1e-8;
-        self.data[0].abs() < s && self.data[1].abs() < s && self.data[2].abs() < s
+        self.pos[0].abs() < s && self.pos[1].abs() < s && self.pos[2].abs() < s
     }
 
     fn hamilton_product(a: [f64; 4], e: [f64; 4]) -> [f64; 4] {
@@ -157,12 +158,12 @@ impl Vec3 {
     }
 
     pub fn rotate(&mut self, degrees: f64, axis: &Vec3) {
-        let p = [0.0, self.data[0], self.data[1], self.data[2]];
+        let p = [0.0, self.pos[0], self.pos[1], self.pos[2]];
         let (r, r_neg) = Vec3::get_rotation(degrees, axis);
         let rpr_neg = Vec3::hamilton_product(Vec3::hamilton_product(r, p), r_neg);
-        self.data[0] = rpr_neg[1];
-        self.data[1] = rpr_neg[2];
-        self.data[2] = rpr_neg[3];
+        self.pos[0] = rpr_neg[1];
+        self.pos[1] = rpr_neg[2];
+        self.pos[2] = rpr_neg[3];
     }
 }
 
@@ -170,19 +171,19 @@ impl Index<usize> for Vec3 {
     type Output = f64;
 
     fn index(&self, index: usize) -> &Self::Output {
-        &self.data[index]
+        &self.pos[index]
     }
 }
 
 pub fn dot(v1: &Vec3, v2: &Vec3) -> f64 {
-    v1.data[0] * v2.data[0] + v1.data[1] * v2.data[1] + v1.data[2] * v2.data[2]
+    v1.pos[0] * v2.pos[0] + v1.pos[1] * v2.pos[1] + v1.pos[2] * v2.pos[2]
 }
 
 pub fn cross(v1: &Vec3, v2: &Vec3) -> Vec3 {
     Vec3::new(
-        v1.data[1] * v2.data[2] - v1.data[2] * v2.data[1],
-        v1.data[2] * v2.data[0] - v1.data[0] * v2.data[2],
-        v1.data[0] * v2.data[1] - v1.data[1] * v2.data[0],
+        v1.pos[1] * v2.pos[2] - v1.pos[2] * v2.pos[1],
+        v1.pos[2] * v2.pos[0] - v1.pos[0] * v2.pos[2],
+        v1.pos[0] * v2.pos[1] - v1.pos[1] * v2.pos[0],
     )
 }
 
@@ -196,9 +197,9 @@ impl ops::Add<Vec3> for Vec3 {
 
     fn add(self, rhs: Vec3) -> Self::Output {
         Vec3::new(
-            self.data[0] + rhs.data[0],
-            self.data[1] + rhs.data[1],
-            self.data[2] + rhs.data[2],
+            self.pos[0] + rhs.pos[0],
+            self.pos[1] + rhs.pos[1],
+            self.pos[2] + rhs.pos[2],
         )
     }
 }
@@ -208,26 +209,26 @@ impl ops::Add<Vec3> for &Vec3 {
 
     fn add(self, rhs: Vec3) -> Self::Output {
         Vec3::new(
-            self.data[0] + rhs.data[0],
-            self.data[1] + rhs.data[1],
-            self.data[2] + rhs.data[2],
+            self.pos[0] + rhs.pos[0],
+            self.pos[1] + rhs.pos[1],
+            self.pos[2] + rhs.pos[2],
         )
     }
 }
 
 impl ops::AddAssign<Vec3> for Vec3 {
     fn add_assign(&mut self, rhs: Vec3) {
-        self.data[0] += rhs.data[0];
-        self.data[1] += rhs.data[1];
-        self.data[2] += rhs.data[2];
+        self.pos[0] += rhs.pos[0];
+        self.pos[1] += rhs.pos[1];
+        self.pos[2] += rhs.pos[2];
     }
 }
 
 impl ops::AddAssign<&Vec3> for Vec3 {
     fn add_assign(&mut self, rhs: &Vec3) {
-        self.data[0] += rhs.data[0];
-        self.data[1] += rhs.data[1];
-        self.data[2] += rhs.data[2];
+        self.pos[0] += rhs.pos[0];
+        self.pos[1] += rhs.pos[1];
+        self.pos[2] += rhs.pos[2];
     }
 }
 
@@ -239,7 +240,7 @@ impl ops::Sub<Vec3> for Vec3 {
     type Output = Vec3;
 
     fn sub(self, rhs: Vec3) -> Self::Output {
-        vec_sub(&self.data, &rhs.data)
+        vec_sub(&self.pos, &rhs.pos)
     }
 }
 
@@ -247,7 +248,7 @@ impl ops::Sub<&Vec3> for Vec3 {
     type Output = Vec3;
 
     fn sub(self, rhs: &Vec3) -> Self::Output {
-        vec_sub(&self.data, &rhs.data)
+        vec_sub(&self.pos, &rhs.pos)
     }
 }
 
@@ -255,15 +256,15 @@ impl ops::Sub<Vec3> for &Vec3 {
     type Output = Vec3;
 
     fn sub(self, rhs: Vec3) -> Self::Output {
-        vec_sub(&self.data, &rhs.data)
+        vec_sub(&self.pos, &rhs.pos)
     }
 }
 
 impl ops::SubAssign for Vec3 {
     fn sub_assign(&mut self, rhs: Self) {
-        self.data[0] -= rhs.data[0];
-        self.data[1] -= rhs.data[1];
-        self.data[2] -= rhs.data[2];
+        self.pos[0] -= rhs.pos[0];
+        self.pos[1] -= rhs.pos[1];
+        self.pos[2] -= rhs.pos[2];
     }
 }
 
@@ -294,9 +295,9 @@ impl ops::Div<f64> for &Vec3 {
 impl ops::DivAssign<f64> for Vec3 {
     fn div_assign(&mut self, rhs: f64) {
         let t = 1.0 / rhs;
-        self.data[0] *= t;
-        self.data[1] *= t;
-        self.data[2] *= t;
+        self.pos[0] *= t;
+        self.pos[1] *= t;
+        self.pos[2] *= t;
     }
 }
 
@@ -304,7 +305,7 @@ impl ops::Mul<f64> for Vec3 {
     type Output = Vec3;
 
     fn mul(self, rhs: f64) -> Self::Output {
-        Vec3::new(self.data[0] * rhs, self.data[1] * rhs, self.data[2] * rhs)
+        Vec3::new(self.pos[0] * rhs, self.pos[1] * rhs, self.pos[2] * rhs)
     }
 }
 
@@ -321,9 +322,9 @@ impl ops::Mul<Vec3> for Vec3 {
 
     fn mul(self, rhs: Vec3) -> Self::Output {
         Vec3::new(
-            self.data[0] * rhs.data[0],
-            self.data[1] * rhs.data[1],
-            self.data[2] * rhs.data[2],
+            self.pos[0] * rhs.pos[0],
+            self.pos[1] * rhs.pos[1],
+            self.pos[2] * rhs.pos[2],
         )
     }
 }
@@ -332,7 +333,7 @@ impl ops::Mul<Vec3> for f64 {
     type Output = Vec3;
 
     fn mul(self, rhs: Vec3) -> Self::Output {
-        Vec3::new(rhs.data[0] * self, rhs.data[1] * self, rhs.data[2] * self)
+        Vec3::new(rhs.pos[0] * self, rhs.pos[1] * self, rhs.pos[2] * self)
     }
 }
 
@@ -340,15 +341,15 @@ impl ops::Mul<&f64> for Vec3 {
     type Output = Vec3;
 
     fn mul(self, rhs: &f64) -> Self::Output {
-        Vec3::new(self.data[0] * rhs, self.data[1] * rhs, self.data[2] * rhs)
+        Vec3::new(self.pos[0] * rhs, self.pos[1] * rhs, self.pos[2] * rhs)
     }
 }
 
 impl ops::MulAssign<f64> for Vec3 {
     fn mul_assign(&mut self, rhs: f64) {
-        self.data[0] *= rhs;
-        self.data[1] *= rhs;
-        self.data[2] *= rhs;
+        self.pos[0] *= rhs;
+        self.pos[1] *= rhs;
+        self.pos[2] *= rhs;
     }
 }
 
@@ -356,7 +357,7 @@ impl ops::Neg for Vec3 {
     type Output = Vec3;
 
     fn neg(self) -> Self::Output {
-        Vec3::new(-self.data[0], -self.data[1], -self.data[2])
+        Vec3::new(-self.pos[0], -self.pos[1], -self.pos[2])
     }
 }
 
@@ -364,39 +365,31 @@ impl ops::Neg for &Vec3 {
     type Output = Vec3;
 
     fn neg(self) -> Self::Output {
-        Vec3::new(-self.data[0], -self.data[1], -self.data[2])
+        Vec3::new(-self.pos[0], -self.pos[1], -self.pos[2])
     }
 }
 
 impl PartialEq for Vec3 {
     fn eq(&self, other: &Self) -> bool {
-        self.data[0] == other.data[0]
-            && self.data[1] == other.data[1]
-            && self.data[2] == other.data[2]
+        self.pos[0] == other.pos[0] && self.pos[1] == other.pos[1] && self.pos[2] == other.pos[2]
     }
 }
 
 impl fmt::Display for Vec3 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(
-            format!(
-                "x: {}, y: {}, z: {}",
-                self.data[0], self.data[1], self.data[2]
-            )
-            .as_str(),
-        )
+        f.write_str(format!("x: {}, y: {}, z: {}", self.pos[0], self.pos[1], self.pos[2]).as_str())
     }
 }
 
 impl std::ops::IndexMut<usize> for Vec3 {
     fn index_mut(&mut self, index: usize) -> &'_ mut Self::Output {
-        &mut self.data[index]
+        &mut self.pos[index]
     }
 }
 
 impl std::fmt::Debug for Vec3 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Vec3").field("data", &self.data).finish()
+        f.debug_struct("Vec3").field("data", &self.pos).finish()
     }
 }
 

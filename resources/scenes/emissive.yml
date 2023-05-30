@@ -1,0 +1,75 @@
+---
+textures:
+  perlin:
+    Noise:
+      scale: 4
+      depth: 7
+      color:
+        color: [ 1.0, 1.0, 1.0 ]
+
+  diffuse_light_color:
+    SolidColor:
+      color:
+        color: [ 1.0, 1.0, 1.0 ]
+
+  diffuse_brignt_light_color:
+    SolidColor:
+      color:
+        color: [ 4.0, 4.0, 4.0 ]
+
+
+materials:
+  perlin:
+    Lambertian:
+        texture: perlin
+
+  diffuse_light:
+    DiffuseLight:
+      texture: diffuse_light_color
+
+  diffuse_bright_light:
+    DiffuseLight:
+      texture: diffuse_brignt_light_color
+
+geometry:
+  ground:
+    Sphere:
+      pos: [ 0, -1000, 0 ]
+      radius: 1000
+      material: perlin
+
+  ball_perlin:
+    Sphere:
+      pos: [ 0, 2, 0 ]
+      radius: 2
+      material: perlin
+
+  ball_light:
+    Sphere:
+      pos: [ 0, 7, 0 ]
+      radius: 2
+      material: diffuse_light
+
+  light_rect:
+    XyRect:
+      x0: 3.0
+      x1: 5.0
+      y0: 1.0
+      y1: 3.0
+      k: -2.0
+      material: diffuse_bright_light
+
+background:
+  SolidColor:
+    pos: [ 0.0, 0.0, 0.0 ]
+
+camera:
+  vfov: 20
+  aperture: 0.01
+  focus_distance: 4
+  pos:
+    pos: [ 20.1, 5.8, 9.5 ]
+  look_at:
+    pos: [ 3, 2, 0 ]
+  speed: 0.00002
+
