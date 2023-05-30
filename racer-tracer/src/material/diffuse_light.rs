@@ -16,6 +16,7 @@ impl DiffuseLight {
         Self { texture }
     }
 
+    #[allow(dead_code)]
     pub fn new_with_color(color: Color) -> Self {
         Self::new(Arc::new(SolidColor::new(color)))
     }

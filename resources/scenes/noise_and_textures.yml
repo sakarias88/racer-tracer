@@ -1,0 +1,79 @@
+---
+textures:
+  earth_map:
+    Image:
+        path: ../resources/images/earthmap.jpg
+
+  checkered_a:
+    SolidColor:
+        color:
+          color: [ 0.5, 1.0, 0.5 ]
+
+  checkered_b:
+    SolidColor:
+      color:
+        color: [ 0.8, 0.8, 0.8 ]
+
+  checkered:
+    Checkered:
+      texture_a: checkered_a
+      texture_b: checkered_b
+
+  perlin:
+    Noise:
+      scale: 4
+      depth: 7
+      color:
+        color: [ 1, 1, 1 ]
+
+materials:
+  earth:
+    Lambertian:
+      texture: earth_map
+
+  checkered:
+    Lambertian:
+        texture: checkered
+
+  perlin:
+    Lambertian:
+        texture: perlin
+
+  dialectric:
+    Dialectric:
+        refraction_index: 1.5
+
+geometry:
+  ground:
+    Sphere:
+      pos: [ 0, -1000, 0 ]
+      radius: 1000
+      material: checkered
+
+  perlin:
+    Sphere:
+      pos: [ 0, 1.0, 0 ]
+      radius: 1
+      material: perlin
+
+  earth:
+    Sphere:
+      pos: [ 0, 1, -2.0 ]
+      radius: 1
+      material: earth
+
+  dialectric:
+    Sphere:
+      pos: [ 0, 1.0, 2.0 ]
+      radius: 1
+      material: dialectric
+
+camera:
+  vfov: 20
+  aperture: 0.01
+  focus_distance: 4
+  pos:
+    pos: [ 12.3, 4, 9.7 ]
+  look_at:
+    pos: [ -0.3, 0.7, 0 ]
+  speed: 0.000002

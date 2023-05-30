@@ -1,14 +1,28 @@
 ---
+textures:
+  grass:
+    SolidColor:
+        color:
+          color: [ 0.8, 0.8, 0.0 ]
+
+  center:
+    SolidColor:
+        color:
+          color: [ 0.1, 0.2, 0.5 ]
+
+  right:
+    SolidColor:
+        color:
+          color: [ 0.8, 0.6, 0.2 ]
+
 materials:
   grass:
     Lambertian:
-      color:
-        data: [ 0.8, 0.8, 0.0 ]
+      texture: grass
 
   center:
     Lambertian:
-      color:
-        data: [ 0.1, 0.2, 0.5 ]
+      texture: center
 
   left:
     Dialectric:
@@ -16,38 +30,37 @@ materials:
 
   right:
     Metal:
-      color:
-        data: [ 0.8, 0.6, 0.2 ]
+      texture: right
       fuzz: 0.0
 
 geometry:
-  - Sphere:
-      pos:
-        data: [ 0.0, -100.5, -1.0 ]
+  grass:
+    Sphere:
+      pos: [ 0.0, -100.5, -1.0 ]
       radius: 100.0
       material: grass
 
-  - Sphere:
-      pos:
-        data: [ 0.0, 0.0, -1.0 ]
+  center:
+    Sphere:
+      pos: [ 0.0, 0.0, -1.0 ]
       radius: 0.5
       material: center
 
-  - Sphere:
-      pos:
-        data: [ -1.0, 0.0, -1.0 ]
+  dialectric_outer:
+    Sphere:
+      pos: [ -1.0, 0.0, -1.0 ]
       radius: 0.5
       material: left
 
-  - Sphere:
-      pos:
-        data: [ -1.0, 0.0, -1.0 ]
+  dialectric_inner:
+    Sphere:
+      pos: [ -1.0, 0.0, -1.0 ]
       radius: -0.4
       material: left
 
-  - Sphere:
-      pos:
-        data: [ 1.0, 0.0, -1.0 ]
+  right:
+    Sphere:
+      pos: [ 1.0, 0.0, -1.0 ]
       radius: 0.5
       material: right
 
@@ -56,7 +69,7 @@ camera:
   aperture: 0.1
   focus_distance: 10
   pos:
-    data: [ 0, 2, 10 ]
+    pos: [ 0, 2, 10 ]
   look_at:
-    data: [ 0, 0, 0 ]
+    pos: [ 0, 0, 0 ]
   speed: 0.00002
