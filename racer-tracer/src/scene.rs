@@ -9,13 +9,15 @@ use std::sync::Arc;
 use crate::{
     aabb::Aabb,
     background_color::BackgroundColor,
-    camera::{Camera, CameraLoadData, SharedCamera},
+    camera::{Camera, SharedCamera},
+    config::CameraConfig,
     data_bus::{DataBus, DataReader, DataWriter},
     error::TracerError,
     geometry::{HitRecord, Hittable},
     image::Image,
     material::Material,
     ray::Ray,
+    tone_map::ToneMap,
     vec3::Vec3,
 };
 
@@ -88,7 +90,8 @@ impl Hittable for SceneObject {
 pub struct SceneLoadData {
     pub objects: Vec<SceneObject>,
     pub background: Box<dyn BackgroundColor>,
-    pub camera: Option<CameraLoadData>,
+    pub camera: Option<CameraConfig>,
+    pub tone_map: Option<Box<dyn ToneMap>>,
 }
 
 pub trait SceneLoader: Send + Sync {

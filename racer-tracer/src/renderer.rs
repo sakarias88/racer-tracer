@@ -5,18 +5,20 @@ use synchronoise::SignalEvent;
 use crate::{
     background_color::BackgroundColor,
     camera::CameraSharedData,
-    config::{Config, Renderer as ConfigRenderer},
+    config::{Config, RendererConfig},
     error::TracerError,
     geometry::Hittable,
     image::Image,
     ray::Ray,
-    vec3::Vec3,
+    tone_map::ToneMap,
+    vec3::{Color, Vec3},
 };
 
 use self::{cpu::CpuRenderer, cpu_scaled::CpuRendererScaled};
 
 pub mod cpu;
 pub mod cpu_scaled;
+pub mod image;
 
 fn do_cancel(cancel_event: Option<&SignalEvent>) -> bool {
     match cancel_event {
@@ -30,7 +32,7 @@ fn ray_color(
     ray: &Ray,
     background: &dyn BackgroundColor,
     depth: usize,
-) -> Vec3 {
+) -> Color {
     if depth == 0 {
         return Vec3::default();
     }
@@ -58,17 +60,18 @@ pub struct RenderData<'a> {
     pub config: &'a Config,
     pub cancel_event: Option<&'a SignalEvent>,
     pub buffer_updated: Option<&'a SignalEvent>,
+    pub tone_mapping: &'a dyn ToneMap,
 }
 
 pub trait Renderer: Send + Sync {
     fn render(&self, render_data: RenderData) -> Result<(), TracerError>;
 }
 
-impl From<&ConfigRenderer> for &dyn Renderer {
-    fn from(r: &ConfigRenderer) -> Self {
+impl From<&RendererConfig> for &dyn Renderer {
+    fn from(r: &RendererConfig) -> Self {
         match r {
-            ConfigRenderer::Cpu => &CpuRenderer {} as &dyn Renderer,
-            ConfigRenderer::CpuPreview => &CpuRendererScaled {} as &dyn Renderer,
+            RendererConfig::Cpu => &CpuRenderer {} as &dyn Renderer,
+            RendererConfig::CpuPreview => &CpuRendererScaled {} as &dyn Renderer,
         }
     }
 }

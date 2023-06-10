@@ -1,5 +1,4 @@
-use serde::Deserialize;
-
+use crate::config::CameraConfig;
 use crate::data_bus::{DataBus, DataReader, DataWriter};
 use crate::error::TracerError;
 use crate::image::Image;
@@ -387,18 +386,7 @@ impl Camera {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Default)]
-pub struct CameraLoadData {
-    pub vfov: Option<f64>,
-    pub aperture: Option<f64>,
-    pub focus_distance: Option<f64>,
-    pub pos: Option<Vec3>,
-    pub look_at: Option<Vec3>,
-    pub speed: Option<f64>,
-    pub sensitivity: Option<f64>,
-}
-
-pub struct RealizedCameraLoadData {
+pub struct CameraData {
     pub vfov: f64,
     pub aperture: f64,
     pub focus_distance: f64,
@@ -408,37 +396,37 @@ pub struct RealizedCameraLoadData {
     pub sensitivity: f64,
 }
 
-impl RealizedCameraLoadData {
-    pub fn merge(data1: CameraLoadData, data2: CameraLoadData) -> Self {
+impl CameraData {
+    pub fn merge(data1: CameraConfig, data2: CameraConfig) -> Self {
         Self {
             vfov: data1
                 .vfov
                 .or(data2.vfov)
-                .unwrap_or_else(RealizedCameraLoadData::default_vfov),
+                .unwrap_or_else(CameraData::default_vfov),
             aperture: data1
                 .aperture
                 .or(data2.aperture)
-                .unwrap_or_else(RealizedCameraLoadData::default_aperture),
+                .unwrap_or_else(CameraData::default_aperture),
             focus_distance: data1
                 .focus_distance
                 .or(data2.focus_distance)
-                .unwrap_or_else(RealizedCameraLoadData::default_focus_distance),
+                .unwrap_or_else(CameraData::default_focus_distance),
             pos: data1
                 .pos
                 .or(data2.pos)
-                .unwrap_or_else(RealizedCameraLoadData::default_pos),
+                .unwrap_or_else(CameraData::default_pos),
             look_at: data1
                 .look_at
                 .or(data2.look_at)
-                .unwrap_or_else(RealizedCameraLoadData::default_look_at),
+                .unwrap_or_else(CameraData::default_look_at),
             speed: data1
                 .speed
                 .or(data2.speed)
-                .unwrap_or_else(RealizedCameraLoadData::default_speed),
+                .unwrap_or_else(CameraData::default_speed),
             sensitivity: data1
                 .sensitivity
                 .or(data2.sensitivity)
-                .unwrap_or_else(RealizedCameraLoadData::default_sensitivity),
+                .unwrap_or_else(CameraData::default_sensitivity),
         }
     }
 

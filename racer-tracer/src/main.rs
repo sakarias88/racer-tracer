@@ -19,6 +19,7 @@ mod scene_controller;
 mod shared_scene;
 mod terminal;
 mod texture;
+mod tone_map;
 mod util;
 mod vec3;
 
@@ -45,12 +46,13 @@ use terminal::Terminal;
 use crate::{
     background_color::BackgroundColor,
     bvh_node::BoundingVolumeHirearchy,
-    camera::{CameraInitData, RealizedCameraLoadData},
-    config::SceneLoader as CLoader,
+    camera::{CameraData, CameraInitData},
+    config::SceneLoaderConfig as CLoader,
     scene::{
         none::NoneLoader, random::Random, sandbox::Sandbox, yml::YmlLoader, Scene, SceneLoader,
     },
     scene_controller::{interactive::InteractiveScene, SceneController},
+    tone_map::ToneMap,
     vec3::Vec3,
 };
 
@@ -74,9 +76,14 @@ fn run(config: Config, log: Logger, term: Terminal) -> Result<(), TracerError> {
 
     let scene_data = loader.load()?;
     let background = &*scene_data.background as &dyn BackgroundColor;
+    let tone_map: Box<dyn ToneMap> = scene_data
+        .tone_map
+        .unwrap_or_else(|| (&config.tone_map).into());
+
+    let tone_mapping = &*tone_map as &dyn ToneMap;
 
     let camera_data =
-        RealizedCameraLoadData::merge(scene_data.camera.unwrap_or_default(), config.camera.clone());
+        CameraData::merge(scene_data.camera.unwrap_or_default(), config.camera.clone());
     let mut camera = Camera::new(
         CameraInitData {
             look_from: camera_data.pos,
@@ -104,15 +111,19 @@ fn run(config: Config, log: Logger, term: Terminal) -> Result<(), TracerError> {
     let mut window_res: Result<(), TracerError> = Ok(());
     let exit = SignalEvent::manual(false);
 
+    let renderer = (&config.renderer).into();
+    let renderer_preview = (&config.preview_renderer).into();
+
     let scene_controller = {
         match &config.scene_controller {
-            config::ConfigSceneController::Interactive => InteractiveScene::new(
+            config::SceneControllerConfig::Interactive => InteractiveScene::new(
                 log.new(o!("scope" => "scene-controller")),
                 term,
                 config.clone(),
                 image.clone(),
-                camera_data.speed,
-                camera_data.sensitivity,
+                camera_data,
+                renderer,
+                renderer_preview,
             ),
         }
     };
@@ -124,7 +135,8 @@ fn run(config: Config, log: Logger, term: Terminal) -> Result<(), TracerError> {
         // Render
         s.spawn(|_| {
             // Seed the first image
-            render_res = scene_controller.render(true, &shared_camera, &bvh, background);
+            render_res =
+                scene_controller.render(true, &shared_camera, &bvh, background, tone_mapping);
 
             while render_res.is_ok() {
                 render_res = (!exit.wait_timeout(Duration::from_secs(0)))
@@ -138,6 +150,7 @@ fn run(config: Config, log: Logger, term: Terminal) -> Result<(), TracerError> {
                             &shared_camera,
                             &bvh,
                             background,
+                            tone_mapping,
                         )
                     });
             }

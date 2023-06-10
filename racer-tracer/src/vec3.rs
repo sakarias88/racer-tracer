@@ -216,6 +216,14 @@ impl ops::Add<Vec3> for &Vec3 {
     }
 }
 
+impl ops::Add<f64> for Vec3 {
+    type Output = Vec3;
+
+    fn add(self, rhs: f64) -> Self::Output {
+        Vec3::new(self.pos[0] + rhs, self.pos[1] + rhs, self.pos[2] + rhs)
+    }
+}
+
 impl ops::AddAssign<Vec3> for Vec3 {
     fn add_assign(&mut self, rhs: Vec3) {
         self.pos[0] += rhs.pos[0];
@@ -257,6 +265,14 @@ impl ops::Sub<Vec3> for &Vec3 {
 
     fn sub(self, rhs: Vec3) -> Self::Output {
         vec_sub(&self.pos, &rhs.pos)
+    }
+}
+
+impl ops::Sub<f64> for Vec3 {
+    type Output = Vec3;
+
+    fn sub(self, rhs: f64) -> Self::Output {
+        Vec3::new(self.pos[0] - rhs, self.pos[1] - rhs, self.pos[2] - rhs)
     }
 }
 
@@ -430,7 +446,6 @@ pub fn random_unit_vector() -> Vec3 {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn add() {
         let v1 = Vec3::new(1.0, 2.0, 3.0);

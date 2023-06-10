@@ -16,6 +16,7 @@ impl SceneLoader for NoneLoader {
             objects: Vec::new(),
             background: Box::<Sky>::default(),
             camera: None,
+            tone_map: None,
         })
     }
 }

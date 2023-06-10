@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     background_color::Sky,
-    camera::CameraLoadData,
+    config::CameraConfig,
     error::TracerError,
     geometry_creation::{create_movable_sphere, create_sphere},
     material::{dialectric::Dialectric, lambertian::Lambertian, metal::Metal},
@@ -81,7 +81,7 @@ impl SceneLoader for Random {
         Ok(SceneLoadData {
             objects: geometry,
             background: Box::<Sky>::default(),
-            camera: Some(CameraLoadData {
+            camera: Some(CameraConfig {
                 vfov: Some(20.0),
                 aperture: Some(0.1),
                 focus_distance: Some(10.0),
@@ -90,6 +90,7 @@ impl SceneLoader for Random {
                 speed: Some(0.000002),
                 sensitivity: None,
             }),
+            tone_map: None,
         })
     }
 }
