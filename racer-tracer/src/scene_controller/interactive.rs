@@ -9,7 +9,7 @@ use synchronoise::SignalEvent;
 
 use crate::{
     background_color::BackgroundColor,
-    camera::{Camera, SharedCamera},
+    camera::{Camera, CameraData, SharedCamera},
     config::Config,
     error::TracerError,
     geometry::Hittable,
@@ -19,6 +19,7 @@ use crate::{
     renderer::{RenderData, Renderer},
     scene::Scene,
     terminal::Terminal,
+    tone_map::ToneMap,
 };
 
 use super::{create_screen_buffer, SceneController};
@@ -47,14 +48,15 @@ impl<'renderer, 'action> InteractiveScene<'renderer, 'action> {
         term: Terminal,
         config: Config,
         image: Image,
-        camera_speed: f64,
-        camera_sensitivity: f64,
+        camera_data: CameraData,
+        renderer: &'renderer dyn Renderer,
+        renderer_preview: &'renderer dyn Renderer,
     ) -> Self {
         Self {
             screen_buffer: RwLock::new(create_screen_buffer(&image)),
             preview_buffer: RwLock::new(create_screen_buffer(&image)),
-            camera_speed,
-            camera_sensitivity,
+            camera_speed: camera_data.speed,
+            camera_sensitivity: camera_data.sensitivity,
             object_move_speed: 0.000001,
             render_image_event: SignalEvent::manual(false),
             buffer_updated: SignalEvent::manual(false),
@@ -63,8 +65,8 @@ impl<'renderer, 'action> InteractiveScene<'renderer, 'action> {
             term,
             image_action: (&config.image_action).into(),
             image,
-            renderer: (&config.renderer).into(),
-            renderer_preview: (&config.preview_renderer).into(),
+            renderer,
+            renderer_preview,
             config,
         }
     }
@@ -224,6 +226,7 @@ impl<'renderer, 'action> SceneController for InteractiveScene<'renderer, 'action
         camera: &SharedCamera,
         scene: &dyn Hittable,
         background: &dyn BackgroundColor,
+        tone_mapping: &dyn ToneMap,
     ) -> Result<(), TracerError> {
         if !scene_changed && !self.render_image_event.status() {
             return Ok(());
@@ -249,6 +252,7 @@ impl<'renderer, 'action> SceneController for InteractiveScene<'renderer, 'action
                             config: &self.config,
                             cancel_event: None,
                             buffer_updated: None,
+                            tone_mapping,
                         })
                         .and_then(|_| {
                             self.screen_buffer
@@ -289,6 +293,7 @@ impl<'renderer, 'action> SceneController for InteractiveScene<'renderer, 'action
                             config: &self.config,
                             cancel_event: Some(&self.render_image_event),
                             buffer_updated: Some(&self.buffer_updated),
+                            tone_mapping,
                         })
                         .and_then(|_| {
                             if !self.render_image_event.status() {

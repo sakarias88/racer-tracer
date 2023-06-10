@@ -67,8 +67,12 @@ impl CpuRendererScaled {
                 let offset = image.y * image.screen_width + image.x;
                 for scaled_row in 0..scaled_height {
                     for scaled_col in 0..scaled_width {
-                        let color = colors[scaled_row * scaled_width + scaled_col]
-                            .scale_sqrt(rd.config.preview.samples)
+                        let color = rd
+                            .tone_mapping
+                            .tone_map(
+                                colors[scaled_row * scaled_width + scaled_col]
+                                    .scale_sqrt(rd.config.preview.samples),
+                            )
                             .as_color();
                         let row = scaled_row * scale_height;
                         let col = scaled_col * scale_width;

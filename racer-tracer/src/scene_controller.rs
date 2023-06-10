@@ -8,6 +8,7 @@ use crate::{
     image::Image,
     key_inputs::{KeyEvent, ListenKeyEvents, MousePos},
     scene::Scene,
+    tone_map::ToneMap,
 };
 
 pub fn create_screen_buffer(image: &Image) -> Vec<u32> {
@@ -32,6 +33,7 @@ pub trait SceneController: Send + Sync {
         camera: &SharedCamera,
         scene: &dyn Hittable,
         background: &dyn BackgroundColor,
+        tone_mapping: &dyn ToneMap,
     ) -> Result<(), TracerError>;
 
     // Returns the screen buffer produced by the scene controller.

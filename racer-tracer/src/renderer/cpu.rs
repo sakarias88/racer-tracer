@@ -54,8 +54,12 @@ impl CpuRenderer {
                 let offset = image.y * image.screen_width + image.x;
                 for row in 0..image.height {
                     for col in 0..image.width {
-                        let color = colors[row * image.width + col]
-                            .scale_sqrt(rd.config.render.samples)
+                        let color = rd
+                            .tone_mapping
+                            .tone_map(
+                                colors[row * image.width + col]
+                                    .scale_sqrt(rd.config.render.samples),
+                            )
                             .as_color();
                         buf[offset + row * image.screen_width + col] = color;
                     }

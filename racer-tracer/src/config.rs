@@ -4,7 +4,10 @@ use config::File;
 use serde::Deserialize;
 use structopt::StructOpt;
 
-use crate::{camera::CameraLoadData, error::TracerError};
+use crate::{
+    error::TracerError,
+    vec3::{Color, Vec3},
+};
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "racer-tracer")]
@@ -21,7 +24,7 @@ pub struct Args {
     pub scene: Option<String>,
 
     #[structopt(long = "image-action")]
-    pub image_action: Option<ImageAction>,
+    pub image_action: Option<ImageActionConfig>,
 }
 
 impl TryFrom<Args> for Config {
@@ -34,9 +37,9 @@ impl TryFrom<Args> for Config {
 
             if let Some(scene) = args.scene {
                 if scene == "random" {
-                    cfg.loader = SceneLoader::Random;
+                    cfg.loader = SceneLoaderConfig::Random;
                 } else if scene == "sandbox" {
-                    cfg.loader = SceneLoader::Sandbox;
+                    cfg.loader = SceneLoaderConfig::Sandbox;
                 } else {
                     let path = PathBuf::from(scene);
                     cfg.loader = path
@@ -49,7 +52,7 @@ impl TryFrom<Args> for Config {
                             ))
                         })
                         .and_then(|p| match p.as_ref() {
-                            "yml" => Ok(SceneLoader::Yml { path: path.clone() }),
+                            "yml" => Ok(SceneLoaderConfig::Yml { path: path.clone() }),
                             _ => Err(TracerError::ArgumentParsingError(format!(
                                 "Could not find a suitable scene loader for file: {}",
                                 path.display()
@@ -64,13 +67,13 @@ impl TryFrom<Args> for Config {
 }
 
 #[derive(Default, Clone, Debug, Deserialize)]
-pub struct Screen {
+pub struct ScreenConfig {
     pub height: usize,
     pub width: usize,
 }
 
 #[derive(Default, Clone, Debug, Deserialize)]
-pub struct RenderConfigData {
+pub struct RenderConfig {
     pub samples: usize,
     pub max_depth: usize,
     pub num_threads_width: usize,
@@ -79,7 +82,7 @@ pub struct RenderConfigData {
 }
 
 #[derive(StructOpt, Debug, Clone, Deserialize, Default)]
-pub enum SceneLoader {
+pub enum SceneLoaderConfig {
     #[default]
     None,
     Yml {
@@ -90,72 +93,124 @@ pub enum SceneLoader {
 }
 
 #[derive(StructOpt, Debug, Clone, Deserialize, Default)]
-pub enum ImageAction {
+pub enum ImageActionConfig {
     #[default]
     WaitForSignal,
     SavePng,
 }
 
 #[derive(StructOpt, Debug, Clone, Deserialize, Default)]
-pub enum ConfigSceneController {
+pub enum SceneControllerConfig {
     #[default]
     Interactive,
 }
 
 #[derive(StructOpt, Debug, Clone, Deserialize, Default)]
-pub enum Renderer {
+pub enum RendererConfig {
     #[default]
     Cpu,
     CpuPreview,
 }
 
-fn default_preview() -> Renderer {
-    Renderer::CpuPreview
+fn default_preview() -> RendererConfig {
+    RendererConfig::CpuPreview
 }
 
-impl FromStr for ImageAction {
+impl FromStr for ImageActionConfig {
     type Err = TracerError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "png" => Ok(ImageAction::SavePng),
-            "show" => Ok(ImageAction::WaitForSignal),
-            _ => Ok(ImageAction::WaitForSignal),
+            "png" => Ok(ImageActionConfig::SavePng),
+            "show" => Ok(ImageActionConfig::WaitForSignal),
+            _ => Ok(ImageActionConfig::WaitForSignal),
         }
     }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ColorMatrix {
+    pub colors: [Color; 3],
+}
+
+// The config crate can't create an enum even if all fields have
+// defaults. It can however create the enum as long as you provide at
+// least one field. This is why we see the default field on some of
+// them. It's just a junk field to avoid the bug and so you can select
+// a tone mapping technique without having to override any default
+// settings.
+// https://github.com/mehcode/config-rs/issues/126
+#[derive(Default, Debug, Clone, Deserialize)]
+pub enum ToneMapConfig {
+    Reinhard {
+        default: Option<bool>,
+        max_white: Option<f64>,
+    },
+    Hable {
+        default: Option<bool>,
+        shoulder_strength: Option<f64>,
+        linear_strength: Option<f64>,
+        linear_angle: Option<f64>,
+        toe_strength: Option<f64>,
+        toe_numerator: Option<f64>,
+        toe_denominator: Option<f64>,
+        exposure_bias: Option<f64>,
+        linear_white_point: Option<f64>,
+    },
+    Aces {
+        default: Option<bool>,
+        input_matrix: Option<ColorMatrix>,
+        output_matrix: Option<ColorMatrix>,
+    },
+    #[default]
+    None,
+}
+
+#[derive(Clone, Debug, Deserialize, Default)]
+pub struct CameraConfig {
+    pub vfov: Option<f64>,
+    pub aperture: Option<f64>,
+    pub focus_distance: Option<f64>,
+    pub pos: Option<Vec3>,
+    pub look_at: Option<Vec3>,
+    pub speed: Option<f64>,
+    pub sensitivity: Option<f64>,
 }
 
 #[derive(Default, Clone, Debug, Deserialize)]
 pub struct Config {
     #[serde(default)]
-    pub preview: RenderConfigData,
+    pub preview: RenderConfig,
 
     #[serde(default)]
-    pub render: RenderConfigData,
+    pub render: RenderConfig,
 
     #[serde(default)]
-    pub screen: Screen,
+    pub screen: ScreenConfig,
 
     #[serde(default)]
-    pub loader: SceneLoader,
+    pub loader: SceneLoaderConfig,
 
     #[serde(default)]
-    pub image_action: ImageAction,
+    pub image_action: ImageActionConfig,
 
     #[serde(default)]
     pub image_output_dir: Option<PathBuf>,
 
     #[serde(default)]
-    pub scene_controller: ConfigSceneController,
+    pub scene_controller: SceneControllerConfig,
 
     #[serde(default)]
-    pub renderer: Renderer,
+    pub renderer: RendererConfig,
 
     #[serde(default = "default_preview")]
-    pub preview_renderer: Renderer,
+    pub preview_renderer: RendererConfig,
 
     #[serde(default)]
-    pub camera: CameraLoadData,
+    pub camera: CameraConfig,
+
+    #[serde(default)]
+    pub tone_map: ToneMapConfig,
 }
 
 impl Config {

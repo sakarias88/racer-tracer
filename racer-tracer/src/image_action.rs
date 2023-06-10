@@ -10,7 +10,7 @@ use crate::image_action::{png::SavePng, wait_for_signal::WaitForSignal};
 
 use crate::terminal::Terminal;
 use crate::{
-    config::{Config, ImageAction as CImageAction},
+    config::{Config, ImageActionConfig},
     error::TracerError,
 };
 
@@ -26,11 +26,11 @@ pub trait ImageAction: Send + Sync {
     ) -> Result<(), TracerError>;
 }
 
-impl From<&CImageAction> for &dyn ImageAction {
-    fn from(image_action: &CImageAction) -> Self {
+impl From<&ImageActionConfig> for &dyn ImageAction {
+    fn from(image_action: &ImageActionConfig) -> Self {
         match image_action {
-            CImageAction::WaitForSignal => &WaitForSignal {} as &dyn ImageAction,
-            CImageAction::SavePng => &SavePng {} as &dyn ImageAction,
+            ImageActionConfig::WaitForSignal => &WaitForSignal {} as &dyn ImageAction,
+            ImageActionConfig::SavePng => &SavePng {} as &dyn ImageAction,
         }
     }
 }

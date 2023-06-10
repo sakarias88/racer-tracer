@@ -8,7 +8,8 @@ use serde::Deserialize;
 
 use crate::{
     background_color::{BackgroundColor, Sky, SolidBackgroundColor},
-    camera::CameraLoadData,
+    config::CameraConfig,
+    config::ToneMapConfig,
     error::TracerError,
     geometry_creation::{
         create_box, create_rotate_y, create_sphere, create_translate, create_xy_rect,
@@ -144,7 +145,8 @@ struct SceneData {
     materials: HashMap<String, MaterialData>,
     geometry: HashMap<String, GeometryData>,
     background: Option<Background>,
-    camera: Option<CameraLoadData>,
+    camera: Option<CameraConfig>,
+    tone_map: Option<ToneMapConfig>,
 }
 
 impl SceneData {
@@ -155,14 +157,14 @@ impl SceneData {
             .map_err(|e| {
                 TracerError::Configuration(
                     file.as_ref().to_string_lossy().into_owned(),
-                    dbg!(e).to_string(),
+                    e.to_string(),
                 )
             })?
             .try_deserialize()
             .map_err(|e| {
                 TracerError::Configuration(
                     file.as_ref().to_string_lossy().into_owned(),
-                    dbg!(e).to_string(),
+                    e.to_string(),
                 )
             })
     }
@@ -450,6 +452,7 @@ impl TryInto<SceneLoadData> for SceneData {
                 None => Box::<Sky>::default() as Box<dyn BackgroundColor>,
             },
             camera: self.camera,
+            tone_map: self.tone_map.map(|t| (&t).into()),
         })
     }
 }

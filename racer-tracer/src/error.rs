@@ -63,6 +63,9 @@ pub enum TracerError {
 
     #[error("Failed to open image {0}: {1}")]
     FailedToOpenImage(String, String),
+
+    #[error("Failed to parse \"{0}\" into a vector: {1}")]
+    FailedToParse(String, String),
 }
 
 impl From<TracerError> for i32 {
@@ -89,6 +92,7 @@ impl From<TracerError> for i32 {
             TracerError::BusTimeoutError() => 19,
             TracerError::NoObjectWithId(_) => 20,
             TracerError::FailedToOpenImage(_, _) => 21,
+            TracerError::FailedToParse(_, _) => 22,
         }
     }
 }

@@ -73,3 +73,6 @@ camera:
     pos: [ 3, 2, 0 ]
   speed: 0.00002
 
+tone_map:
+  Aces:
+    default: true

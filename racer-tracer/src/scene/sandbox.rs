@@ -2,7 +2,7 @@ use std::{path::PathBuf, sync::Arc};
 
 use crate::{
     background_color::SolidBackgroundColor,
-    camera::CameraLoadData,
+    config::CameraConfig,
     error::TracerError,
     geometry_creation::{create_box, create_rotate_y, create_translate},
     material::{lambertian::Lambertian, Material},
@@ -66,7 +66,7 @@ impl Sandbox {
         Ok(SceneLoadData {
             objects: geometry,
             background: Box::new(SolidBackgroundColor::new(Color::new(0.0, 0.0, 0.0))),
-            camera: Some(CameraLoadData {
+            camera: Some(CameraConfig {
                 vfov: Some(40.0),
                 aperture: Some(0.0),
                 focus_distance: Some(10000.0),
@@ -75,6 +75,7 @@ impl Sandbox {
                 speed: None,
                 sensitivity: None,
             }),
+            tone_map: None,
         })
     }
 }
