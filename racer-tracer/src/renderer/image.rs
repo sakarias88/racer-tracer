@@ -2,53 +2,54 @@
 
 use std::path::Path;
 
-use image::ImageBuffer;
+use crate::{error::TracerError, image::Image, vec3::Color};
 
-use crate::{error::TracerError, vec3::Color};
-
-use super::{RenderData, Renderer};
+use super::{ImageData, RenderData, Renderer};
 
 pub struct ImageDisplayer {
-    img: ImageBuffer<img::Rgba<u8>, std::vec::Vec<u8>>,
+    rgb_buffer: Vec<Color>,
 }
 
 impl ImageDisplayer {
     #[allow(dead_code)]
-    pub fn try_new(path: &Path) -> Result<Self, TracerError> {
+    pub fn try_new(path: &Path, image: &Image) -> Result<Self, TracerError> {
         image::open(path)
             .map_err(|e| {
                 TracerError::FailedToOpenImage(path.to_string_lossy().into_owned(), e.to_string())
             })
-            .map(|v| Self {
-                img: v.into_rgba8(),
+            .map(|v| v.into_rgba8())
+            .map(|image_buffer| {
+                let mut rgb_buffer = Vec::with_capacity(image.width * image.height);
+                for row in 0..image.height {
+                    for col in 0..image.width {
+                        if row >= image_buffer.height() as usize
+                            || col >= image_buffer.width() as usize
+                        {
+                            rgb_buffer[row * image.width + col] = Color::default();
+                        } else {
+                            let pixel = image_buffer.get_pixel(col as u32, row as u32);
+                            let color_scale = 1.0 / 255.0;
+                            rgb_buffer[row * image.width + col] = Color::new(
+                                f64::from(pixel.0[0]) * color_scale,
+                                f64::from(pixel.0[1]) * color_scale,
+                                f64::from(pixel.0[2]) * color_scale,
+                            );
+                        };
+                    }
+                }
+                Self { rgb_buffer }
             })
     }
 }
 
 impl Renderer for ImageDisplayer {
-    fn render(&self, rd: RenderData) -> Result<(), crate::error::TracerError> {
-        let mut buffer = rd
-            .buffer
-            .write()
-            .map_err(|e| TracerError::FailedToAcquireLock(e.to_string()))?;
-
-        for row in 0..rd.image.height {
-            for col in 0..rd.image.width {
-                let color = if row >= self.img.height() as usize || col >= self.img.width() as usize
-                {
-                    Color::default()
-                } else {
-                    let pixel = self.img.get_pixel(col as u32, row as u32);
-                    let color_scale = 1.0 / 255.0;
-                    rd.tone_mapping.tone_map(Color::new(
-                        f64::from(pixel.0[0]) * color_scale,
-                        f64::from(pixel.0[1]) * color_scale,
-                        f64::from(pixel.0[2]) * color_scale,
-                    ))
-                };
-                buffer[row * rd.image.width + col] = color.as_color();
-            }
-        }
+    fn render(&self, _rd: RenderData) -> Result<(), crate::error::TracerError> {
         Ok(())
+    }
+
+    fn image_data(&self) -> Result<ImageData, TracerError> {
+        Ok(ImageData {
+            rgb: self.rgb_buffer.clone(),
+        })
     }
 }

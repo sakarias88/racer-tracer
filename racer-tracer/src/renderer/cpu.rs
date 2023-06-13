@@ -1,19 +1,29 @@
+use std::sync::RwLock;
+
 use rayon::prelude::*;
 
 use crate::{
     camera::{Camera, CameraSharedData},
     error::TracerError,
-    image::SubImage,
+    image::{Image, SubImage},
     renderer::{do_cancel, ray_color, Renderer},
     util::random_double,
-    vec3::Vec3,
+    vec3::{Color, Vec3},
 };
 
-use super::RenderData;
+use super::{ImageData, RenderData};
 
-pub struct CpuRenderer {}
+pub struct CpuRenderer {
+    rgb_buffer: RwLock<Vec<Color>>,
+}
 
 impl CpuRenderer {
+    pub fn new(image: &Image) -> Self {
+        Self {
+            rgb_buffer: RwLock::new(vec![Vec3::default(); image.height * image.width]),
+        }
+    }
+
     pub fn raytrace(
         &self,
         rd: &RenderData,
@@ -46,7 +56,7 @@ impl CpuRenderer {
             .then_some(|| ())
             .ok_or(TracerError::CancelEvent)
             .and_then(|_| {
-                rd.buffer
+                self.rgb_buffer
                     .write()
                     .map_err(|e| TracerError::FailedToAcquireLock(e.to_string()))
             })
@@ -54,18 +64,9 @@ impl CpuRenderer {
                 let offset = image.y * image.screen_width + image.x;
                 for row in 0..image.height {
                     for col in 0..image.width {
-                        let color = rd
-                            .tone_mapping
-                            .tone_map(
-                                colors[row * image.width + col]
-                                    .scale_sqrt(rd.config.render.samples),
-                            )
-                            .as_color();
-                        buf[offset + row * image.screen_width + col] = color;
+                        buf[offset + row * image.screen_width + col] =
+                            colors[row * image.width + col].scale_sqrt(rd.config.render.samples);
                     }
-                }
-                if let Some(updated) = rd.buffer_updated {
-                    updated.signal()
                 }
             })
     }
@@ -118,5 +119,12 @@ impl Renderer for CpuRenderer {
                 .map(|image| self.raytrace(&rd, rd.camera_data, &image))
                 .collect::<Result<(), TracerError>>()
         })
+    }
+
+    fn image_data(&self) -> Result<ImageData, TracerError> {
+        self.rgb_buffer
+            .read()
+            .map_err(|e| TracerError::FailedToAcquireLock(e.to_string()))
+            .map(|v| ImageData { rgb: v.clone() })
     }
 }

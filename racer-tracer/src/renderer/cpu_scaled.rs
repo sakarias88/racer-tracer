@@ -1,15 +1,17 @@
+use std::sync::RwLock;
+
 use rayon::prelude::*;
 
 use crate::{
     camera::{Camera, CameraSharedData},
     error::TracerError,
-    image::SubImage,
+    image::{Image, SubImage},
     renderer::{cpu::CpuRenderer, do_cancel, ray_color, Renderer},
     util::random_double,
-    vec3::Vec3,
+    vec3::{Color, Vec3},
 };
 
-use super::RenderData;
+use super::{ImageData, RenderData};
 
 fn get_highest_divdable(value: usize, mut div: usize) -> usize {
     // Feels like there could possibly be some other nicer trick to this.
@@ -19,9 +21,17 @@ fn get_highest_divdable(value: usize, mut div: usize) -> usize {
     div
 }
 
-pub struct CpuRendererScaled {}
+pub struct CpuRendererScaled {
+    rgb_buffer: RwLock<Vec<Color>>,
+}
 
 impl CpuRendererScaled {
+    pub fn new(image: &Image) -> Self {
+        Self {
+            rgb_buffer: RwLock::new(vec![Vec3::default(); image.height * image.width]),
+        }
+    }
+
     pub fn raytrace(
         &self,
         rd: &RenderData,
@@ -59,7 +69,7 @@ impl CpuRendererScaled {
             .then_some(|| ())
             .ok_or(TracerError::CancelEvent)
             .and_then(|_| {
-                rd.buffer
+                self.rgb_buffer
                     .write()
                     .map_err(|e| TracerError::FailedToAcquireLock(e.to_string()))
             })
@@ -67,13 +77,6 @@ impl CpuRendererScaled {
                 let offset = image.y * image.screen_width + image.x;
                 for scaled_row in 0..scaled_height {
                     for scaled_col in 0..scaled_width {
-                        let color = rd
-                            .tone_mapping
-                            .tone_map(
-                                colors[scaled_row * scaled_width + scaled_col]
-                                    .scale_sqrt(rd.config.preview.samples),
-                            )
-                            .as_color();
                         let row = scaled_row * scale_height;
                         let col = scaled_col * scale_width;
                         for scale_h in 0..scale_height {
@@ -81,13 +84,11 @@ impl CpuRendererScaled {
                                 buf[offset
                                     + (row + scale_h) * image.screen_width
                                     + col
-                                    + scale_w] = color;
+                                    + scale_w] = colors[scaled_row * scaled_width + scaled_col]
+                                    .scale_sqrt(rd.config.preview.samples);
                             }
                         }
                     }
-                }
-                if let Some(updated) = rd.buffer_updated {
-                    updated.signal()
                 }
             })
     }
@@ -112,5 +113,11 @@ impl Renderer for CpuRendererScaled {
                 })
                 .collect::<Result<(), TracerError>>()
         })
+    }
+    fn image_data(&self) -> Result<ImageData, TracerError> {
+        self.rgb_buffer
+            .read()
+            .map_err(|e| TracerError::FailedToAcquireLock(e.to_string()))
+            .map(|v| ImageData { rgb: v.clone() })
     }
 }
