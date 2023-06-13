@@ -1,4 +1,4 @@
-use std::{sync::RwLock, time::Duration};
+use std::time::Duration;
 
 use synchronoise::SignalEvent;
 
@@ -10,7 +10,6 @@ use crate::{
     geometry::Hittable,
     image::Image,
     ray::Ray,
-    tone_map::ToneMap,
     vec3::{Color, Vec3},
 };
 
@@ -52,26 +51,34 @@ fn ray_color(
 }
 
 pub struct RenderData<'a> {
-    pub buffer: &'a RwLock<Vec<u32>>,
     pub camera_data: &'a CameraSharedData,
     pub image: &'a Image,
     pub scene: &'a dyn Hittable,
     pub background: &'a dyn BackgroundColor,
     pub config: &'a Config,
     pub cancel_event: Option<&'a SignalEvent>,
-    pub buffer_updated: Option<&'a SignalEvent>,
-    pub tone_mapping: &'a dyn ToneMap,
 }
 
 pub trait Renderer: Send + Sync {
     fn render(&self, render_data: RenderData) -> Result<(), TracerError>;
+
+    // Would preferably want to return a slice of color but due to for
+    // example being threaded behind rw locks it makes it
+    // difficult. Thinking this is probably ok since there will be
+    // more passes of the image data afterwards such as tone mapping
+    // which would require a change in the data anyway.
+    fn image_data(&self) -> Result<ImageData, TracerError>;
 }
 
-impl From<&RendererConfig> for &dyn Renderer {
-    fn from(r: &RendererConfig) -> Self {
-        match r {
-            RendererConfig::Cpu => &CpuRenderer {} as &dyn Renderer,
-            RendererConfig::CpuPreview => &CpuRendererScaled {} as &dyn Renderer,
+impl From<(&RendererConfig, &Image)> for Box<dyn Renderer> {
+    fn from(r: (&RendererConfig, &Image)) -> Self {
+        match r.0 {
+            RendererConfig::Cpu => Box::new(CpuRenderer::new(r.1)),
+            RendererConfig::CpuPreview => Box::new(CpuRendererScaled::new(r.1)),
         }
     }
+}
+
+pub struct ImageData {
+    pub rgb: Vec<Color>,
 }

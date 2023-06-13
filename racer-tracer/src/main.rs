@@ -23,6 +23,17 @@ mod tone_map;
 mod util;
 mod vec3;
 
+// TODO:
+// - Implement SVGF
+//   https://github.com/TheVaffel/spatiotemporal-variance-guided-filtering
+//   https://scholarship.tricolib.brynmawr.edu/bitstream/handle/10066/24508/2022HuangH.pdf?sequence=1&isAllowed=y
+//   https://teamwisp.github.io/research/svfg.html
+//   https://research.nvidia.com/sites/default/files/pubs/2017-07_Spatiotemporal-Variance-Guided-Filtering%3A//svgf_preprint.pdf
+//   Misc: https://cs.dartmouth.edu/wjarosz/publications/mara17towards.pdf
+// - Renderers should not directly convert to the image output format.
+//   Don't call to_color
+// - Tone mapping must be moved and used as a separate last step on the image as a whole.
+
 extern crate image as img;
 
 #[macro_use]
@@ -48,6 +59,7 @@ use crate::{
     bvh_node::BoundingVolumeHirearchy,
     camera::{CameraData, CameraInitData},
     config::SceneLoaderConfig as CLoader,
+    renderer::Renderer,
     scene::{
         none::NoneLoader, random::Random, sandbox::Sandbox, yml::YmlLoader, Scene, SceneLoader,
     },
@@ -111,8 +123,8 @@ fn run(config: Config, log: Logger, term: Terminal) -> Result<(), TracerError> {
     let mut window_res: Result<(), TracerError> = Ok(());
     let exit = SignalEvent::manual(false);
 
-    let renderer = (&config.renderer).into();
-    let renderer_preview = (&config.preview_renderer).into();
+    let renderer: Box<dyn Renderer> = (&config.renderer, &image).into();
+    let renderer_preview: Box<dyn Renderer> = (&config.preview_renderer, &image).into();
 
     let scene_controller = {
         match &config.scene_controller {

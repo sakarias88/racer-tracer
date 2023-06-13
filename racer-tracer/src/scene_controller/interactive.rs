@@ -24,42 +24,38 @@ use crate::{
 
 use super::{create_screen_buffer, SceneController};
 
-pub struct InteractiveScene<'renderer, 'action> {
+pub struct InteractiveScene<'action> {
     screen_buffer: RwLock<Vec<u32>>,
-    preview_buffer: RwLock<Vec<u32>>,
     camera_speed: f64,
     camera_sensitivity: f64,
     object_move_speed: f64,
     render_image_event: SignalEvent,
-    buffer_updated: SignalEvent,
     stop_event: SignalEvent,
     log: Logger,
     term: Terminal,
     image_action: &'action dyn ImageAction,
     config: Config,
     image: Image,
-    renderer: &'renderer dyn Renderer,
-    renderer_preview: &'renderer dyn Renderer,
+    renderer: Box<dyn Renderer>,
+    renderer_preview: Box<dyn Renderer>,
 }
 
-impl<'renderer, 'action> InteractiveScene<'renderer, 'action> {
+impl<'action> InteractiveScene<'action> {
     pub fn new(
         log: Logger,
         term: Terminal,
         config: Config,
         image: Image,
         camera_data: CameraData,
-        renderer: &'renderer dyn Renderer,
-        renderer_preview: &'renderer dyn Renderer,
+        renderer: Box<dyn Renderer>,
+        renderer_preview: Box<dyn Renderer>,
     ) -> Self {
         Self {
             screen_buffer: RwLock::new(create_screen_buffer(&image)),
-            preview_buffer: RwLock::new(create_screen_buffer(&image)),
             camera_speed: camera_data.speed,
             camera_sensitivity: camera_data.sensitivity,
             object_move_speed: 0.000001,
             render_image_event: SignalEvent::manual(false),
-            buffer_updated: SignalEvent::manual(false),
             stop_event: SignalEvent::manual(false),
             log,
             term,
@@ -72,7 +68,7 @@ impl<'renderer, 'action> InteractiveScene<'renderer, 'action> {
     }
 }
 
-impl<'renderer, 'action> SceneController for InteractiveScene<'renderer, 'action> {
+impl<'action> SceneController for InteractiveScene<'action> {
     fn update(
         &self,
         dt: f64,
@@ -209,15 +205,10 @@ impl<'renderer, 'action> SceneController for InteractiveScene<'renderer, 'action
     }
 
     fn get_buffer(&self) -> Result<Option<Vec<u32>>, TracerError> {
-        self.buffer_updated
-            .wait_timeout(Duration::from_secs(0))
-            .then_some(|| ())
-            .map_or(Ok(None), |_| {
-                self.screen_buffer
-                    .read()
-                    .map_err(|e| TracerError::FailedToAcquireLock(e.to_string()))
-                    .map(|v| Some(v.to_owned()))
-            })
+        self.screen_buffer
+            .read()
+            .map_err(|e| TracerError::FailedToAcquireLock(e.to_string()))
+            .map(|v| Some(v.to_owned()))
     }
 
     fn render(
@@ -226,7 +217,7 @@ impl<'renderer, 'action> SceneController for InteractiveScene<'renderer, 'action
         camera: &SharedCamera,
         scene: &dyn Hittable,
         background: &dyn BackgroundColor,
-        tone_mapping: &dyn ToneMap,
+        tone_map: &dyn ToneMap,
     ) -> Result<(), TracerError> {
         if !scene_changed && !self.render_image_event.status() {
             return Ok(());
@@ -244,15 +235,12 @@ impl<'renderer, 'action> SceneController for InteractiveScene<'renderer, 'action
                     // Which is why we send in a different buffer.
                     self.renderer_preview
                         .render(RenderData {
-                            buffer: &self.preview_buffer,
                             camera_data: camera.data(),
                             image: &self.image,
                             scene,
                             background,
                             config: &self.config,
                             cancel_event: None,
-                            buffer_updated: None,
-                            tone_mapping,
                         })
                         .and_then(|_| {
                             self.screen_buffer
@@ -260,16 +248,14 @@ impl<'renderer, 'action> SceneController for InteractiveScene<'renderer, 'action
                                 .map_err(|e| TracerError::FailedToAcquireLock(e.to_string()))
                         })
                         .and_then(|w_buffer| {
-                            self.preview_buffer
-                                .read()
-                                .map_err(|e| TracerError::FailedToAcquireLock(e.to_string()))
-                                .map(|r_buffer| (r_buffer, w_buffer))
+                            self.renderer_preview
+                                .image_data()
+                                .map(|image_data| (w_buffer, image_data))
                         })
-                        .map(|(r_buffer, mut w_buffer)| {
-                            // For the preview we want the complete image
-                            // result before signaling the image is done.
-                            *w_buffer = r_buffer.to_owned();
-                            self.buffer_updated.signal();
+                        .map(|(mut w_buffer, image_data)| {
+                            for (i, c) in image_data.rgb.into_iter().enumerate() {
+                                w_buffer[i] = tone_map.tone_map(c).as_color();
+                            }
                         })
                 },
                 |_| {
@@ -285,15 +271,27 @@ impl<'renderer, 'action> SceneController for InteractiveScene<'renderer, 'action
                     // partial updates of the rendered image.
                     self.renderer
                         .render(RenderData {
-                            buffer: &self.screen_buffer,
                             camera_data: camera.data(),
                             image: &self.image,
                             scene,
                             background,
                             config: &self.config,
                             cancel_event: Some(&self.render_image_event),
-                            buffer_updated: Some(&self.buffer_updated),
-                            tone_mapping,
+                        })
+                        .and_then(|_| {
+                            self.screen_buffer
+                                .write()
+                                .map_err(|e| TracerError::FailedToAcquireLock(e.to_string()))
+                        })
+                        .and_then(|w_buffer| {
+                            self.renderer
+                                .image_data()
+                                .map(|image_data| (w_buffer, image_data))
+                        })
+                        .map(|(mut w_buffer, image_data)| {
+                            for (i, c) in image_data.rgb.into_iter().enumerate() {
+                                w_buffer[i] = tone_map.tone_map(c).as_color();
+                            }
                         })
                         .and_then(|_| {
                             if !self.render_image_event.status() {
