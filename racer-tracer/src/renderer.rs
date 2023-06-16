@@ -5,8 +5,9 @@ use synchronoise::SignalEvent;
 use crate::{
     background_color::BackgroundColor,
     camera::CameraSharedData,
-    config::{Config, RendererConfig},
+    config::{Config, RenderConfig, RendererConfig},
     error::TracerError,
+    gbuffer::ImageBufferWriter,
     geometry::Hittable,
     image::Image,
     ray::Ray,
@@ -60,25 +61,18 @@ pub struct RenderData<'a> {
 }
 
 pub trait Renderer: Send + Sync {
-    fn render(&self, render_data: RenderData) -> Result<(), TracerError>;
-
-    // Would preferably want to return a slice of color but due to for
-    // example being threaded behind rw locks it makes it
-    // difficult. Thinking this is probably ok since there will be
-    // more passes of the image data afterwards such as tone mapping
-    // which would require a change in the data anyway.
-    fn image_data(&self) -> Result<ImageData, TracerError>;
+    fn render(
+        &self,
+        render_data: RenderData,
+        gbuffer_writer: &ImageBufferWriter,
+    ) -> Result<(), TracerError>;
 }
 
-impl From<(&RendererConfig, &Image)> for Box<dyn Renderer> {
-    fn from(r: (&RendererConfig, &Image)) -> Self {
+impl From<(&RendererConfig, &RenderConfig, &Image)> for Box<dyn Renderer> {
+    fn from(r: (&RendererConfig, &RenderConfig, &Image)) -> Self {
         match r.0 {
-            RendererConfig::Cpu => Box::new(CpuRenderer::new(r.1)),
-            RendererConfig::CpuPreview => Box::new(CpuRendererScaled::new(r.1)),
+            RendererConfig::Cpu => Box::new(CpuRenderer::new(r.1.clone())),
+            RendererConfig::CpuPreview => Box::new(CpuRendererScaled::new(r.1.clone(), r.2)),
         }
     }
-}
-
-pub struct ImageData {
-    pub rgb: Vec<Color>,
 }

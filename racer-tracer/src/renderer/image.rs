@@ -2,12 +2,12 @@
 
 use std::path::Path;
 
-use crate::{error::TracerError, image::Image, vec3::Color};
+use crate::{error::TracerError, gbuffer::ImageBufferWriter, image::Image, vec3::Color};
 
-use super::{ImageData, RenderData, Renderer};
+use super::{RenderData, Renderer};
 
 pub struct ImageDisplayer {
-    rgb_buffer: Vec<Color>,
+    buffer: Vec<Color>,
 }
 
 impl ImageDisplayer {
@@ -37,19 +37,14 @@ impl ImageDisplayer {
                         };
                     }
                 }
-                Self { rgb_buffer }
+                Self { buffer: rgb_buffer }
             })
     }
 }
 
 impl Renderer for ImageDisplayer {
-    fn render(&self, _rd: RenderData) -> Result<(), crate::error::TracerError> {
-        Ok(())
-    }
-
-    fn image_data(&self) -> Result<ImageData, TracerError> {
-        Ok(ImageData {
-            rgb: self.rgb_buffer.clone(),
-        })
+    fn render(&self, rd: RenderData, writer: &ImageBufferWriter) -> Result<(), TracerError> {
+        let mut writer = writer.clone();
+        writer.write(self.buffer.clone(), 0, 0, rd.image.width, rd.image.height)
     }
 }

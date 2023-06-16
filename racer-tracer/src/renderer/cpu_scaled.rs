@@ -1,17 +1,17 @@
-use std::sync::RwLock;
-
 use rayon::prelude::*;
 
 use crate::{
     camera::{Camera, CameraSharedData},
+    config::RenderConfig,
     error::TracerError,
+    gbuffer::ImageBufferWriter,
     image::{Image, SubImage},
     renderer::{cpu::CpuRenderer, do_cancel, ray_color, Renderer},
     util::random_double,
     vec3::{Color, Vec3},
 };
 
-use super::{ImageData, RenderData};
+use super::RenderData;
 
 fn get_highest_divdable(value: usize, mut div: usize) -> usize {
     // Feels like there could possibly be some other nicer trick to this.
@@ -22,13 +22,22 @@ fn get_highest_divdable(value: usize, mut div: usize) -> usize {
 }
 
 pub struct CpuRendererScaled {
-    rgb_buffer: RwLock<Vec<Color>>,
+    config: RenderConfig,
+    scale_width: usize,
+    scale_height: usize,
 }
 
 impl CpuRendererScaled {
-    pub fn new(image: &Image) -> Self {
+    pub fn new(config: RenderConfig, image: &Image) -> Self {
+        let scale_width =
+            get_highest_divdable(image.width / config.num_threads_width, config.scale);
+        let scale_height =
+            get_highest_divdable(image.height / config.num_threads_height, config.scale);
+
         Self {
-            rgb_buffer: RwLock::new(vec![Vec3::default(); image.height * image.width]),
+            config,
+            scale_width,
+            scale_height,
         }
     }
 
@@ -36,27 +45,37 @@ impl CpuRendererScaled {
         &self,
         rd: &RenderData,
         camera_data: &CameraSharedData,
-        image: &SubImage,
-        scale: (usize, usize),
+        mut image: SubImage,
     ) -> Result<(), TracerError> {
-        let (scale_width, scale_height) = scale;
-        let scaled_width = image.width / scale_width;
-        let scaled_height = image.height / scale_height;
+        let scaled_width = image.width / self.scale_width;
+        let scaled_height = image.height / self.scale_height;
+        let mut buffer = vec![Vec3::default(); image.height * image.width];
 
-        let mut colors: Vec<Vec3> = vec![Vec3::default(); scaled_height * scaled_width];
         for row in 0..scaled_height {
             for column in 0..scaled_width {
-                let u: f64 = ((image.x + column * scale_width) as f64 + random_double())
+                let u: f64 = ((image.x + column * self.scale_width) as f64 + random_double())
                     / (image.screen_width - 1) as f64;
-                for _ in 0..rd.config.preview.samples {
-                    let v: f64 = ((image.y + row * scale_height) as f64 + random_double())
+                let mut color = Color::default();
+                for _ in 0..self.config.samples {
+                    let v: f64 = ((image.y + row * self.scale_height) as f64 + random_double())
                         / (image.screen_height - 1) as f64;
-                    colors[row * scaled_width + column].add(ray_color(
+                    color.add(ray_color(
                         rd.scene,
                         &Camera::get_ray(camera_data, u, v),
                         rd.background,
-                        rd.config.preview.max_depth,
+                        self.config.max_depth,
                     ));
+                }
+
+                // Scale up color
+                color = color.scale_sqrt(self.config.samples);
+                let upscaled_row = row * self.scale_height;
+                let upscaled_col = column * self.scale_width;
+                for scale_h in 0..self.scale_height {
+                    for scale_w in 0..self.scale_width {
+                        buffer[(scale_h + upscaled_row) * image.width + scale_w + upscaled_col] =
+                            color;
+                    }
                 }
             }
 
@@ -65,59 +84,23 @@ impl CpuRendererScaled {
             }
         }
 
-        (!do_cancel(rd.cancel_event))
-            .then_some(|| ())
-            .ok_or(TracerError::CancelEvent)
-            .and_then(|_| {
-                self.rgb_buffer
-                    .write()
-                    .map_err(|e| TracerError::FailedToAcquireLock(e.to_string()))
-            })
-            .map(|mut buf| {
-                let offset = image.y * image.screen_width + image.x;
-                for scaled_row in 0..scaled_height {
-                    for scaled_col in 0..scaled_width {
-                        let row = scaled_row * scale_height;
-                        let col = scaled_col * scale_width;
-                        for scale_h in 0..scale_height {
-                            for scale_w in 0..scale_width {
-                                buf[offset
-                                    + (row + scale_h) * image.screen_width
-                                    + col
-                                    + scale_w] = colors[scaled_row * scaled_width + scaled_col]
-                                    .scale_sqrt(rd.config.preview.samples);
-                            }
-                        }
-                    }
-                }
-            })
+        image
+            .writer
+            .write(buffer, image.y, image.x, image.width, image.height)
     }
 }
 
 impl Renderer for CpuRendererScaled {
-    fn render(&self, rd: RenderData) -> Result<(), crate::error::TracerError> {
-        let scale_width = get_highest_divdable(
-            rd.image.width / rd.config.render.num_threads_width,
-            rd.config.preview.scale,
-        );
-        let scale_height = get_highest_divdable(
-            rd.image.height / rd.config.render.num_threads_height,
-            rd.config.preview.scale,
-        );
-
-        CpuRenderer::prepare_threads(&rd).and_then(|images| {
+    fn render(
+        &self,
+        rd: RenderData,
+        writer: &ImageBufferWriter,
+    ) -> Result<(), crate::error::TracerError> {
+        CpuRenderer::prepare_threads(&rd, &self.config, writer).and_then(|images| {
             images
                 .into_par_iter()
-                .map(|image| {
-                    self.raytrace(&rd, rd.camera_data, &image, (scale_width, scale_height))
-                })
+                .map(|image| self.raytrace(&rd, rd.camera_data, image))
                 .collect::<Result<(), TracerError>>()
         })
-    }
-    fn image_data(&self) -> Result<ImageData, TracerError> {
-        self.rgb_buffer
-            .read()
-            .map_err(|e| TracerError::FailedToAcquireLock(e.to_string()))
-            .map(|v| ImageData { rgb: v.clone() })
     }
 }

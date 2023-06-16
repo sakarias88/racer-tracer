@@ -1,7 +1,4 @@
-use std::{
-    sync::RwLock,
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
 use minifb::{Key, MouseButton};
 use slog::Logger;
@@ -12,6 +9,7 @@ use crate::{
     camera::{Camera, CameraData, SharedCamera},
     config::Config,
     error::TracerError,
+    gbuffer::ImageBufferWriter,
     geometry::Hittable,
     image::Image,
     image_action::ImageAction,
@@ -19,13 +17,11 @@ use crate::{
     renderer::{RenderData, Renderer},
     scene::Scene,
     terminal::Terminal,
-    tone_map::ToneMap,
 };
 
-use super::{create_screen_buffer, SceneController};
+use super::SceneController;
 
 pub struct InteractiveScene<'action> {
-    screen_buffer: RwLock<Vec<u32>>,
     camera_speed: f64,
     camera_sensitivity: f64,
     object_move_speed: f64,
@@ -51,7 +47,6 @@ impl<'action> InteractiveScene<'action> {
         renderer_preview: Box<dyn Renderer>,
     ) -> Self {
         Self {
-            screen_buffer: RwLock::new(create_screen_buffer(&image)),
             camera_speed: camera_data.speed,
             camera_sensitivity: camera_data.sensitivity,
             object_move_speed: 0.000001,
@@ -204,20 +199,13 @@ impl<'action> SceneController for InteractiveScene<'action> {
         ]
     }
 
-    fn get_buffer(&self) -> Result<Option<Vec<u32>>, TracerError> {
-        self.screen_buffer
-            .read()
-            .map_err(|e| TracerError::FailedToAcquireLock(e.to_string()))
-            .map(|v| Some(v.to_owned()))
-    }
-
     fn render(
         &self,
         scene_changed: bool,
         camera: &SharedCamera,
         scene: &dyn Hittable,
         background: &dyn BackgroundColor,
-        tone_map: &dyn ToneMap,
+        image_buffer_writer: &ImageBufferWriter,
     ) -> Result<(), TracerError> {
         if !scene_changed && !self.render_image_event.status() {
             return Ok(());
@@ -231,32 +219,17 @@ impl<'action> SceneController for InteractiveScene<'action> {
                     // Render preview
                     self.render_image_event.reset();
 
-                    // We do not want partial screen updates for the preview.
-                    // Which is why we send in a different buffer.
-                    self.renderer_preview
-                        .render(RenderData {
+                    self.renderer_preview.render(
+                        RenderData {
                             camera_data: camera.data(),
                             image: &self.image,
                             scene,
                             background,
                             config: &self.config,
                             cancel_event: None,
-                        })
-                        .and_then(|_| {
-                            self.screen_buffer
-                                .write()
-                                .map_err(|e| TracerError::FailedToAcquireLock(e.to_string()))
-                        })
-                        .and_then(|w_buffer| {
-                            self.renderer_preview
-                                .image_data()
-                                .map(|image_data| (w_buffer, image_data))
-                        })
-                        .map(|(mut w_buffer, image_data)| {
-                            for (i, c) in image_data.rgb.into_iter().enumerate() {
-                                w_buffer[i] = tone_map.tone_map(c).as_color();
-                            }
-                        })
+                        },
+                        image_buffer_writer,
+                    )
                 },
                 |_| {
                     let render_time = Instant::now();
@@ -270,30 +243,18 @@ impl<'action> SceneController for InteractiveScene<'action> {
                     // thread finishes writing a block and we get
                     // partial updates of the rendered image.
                     self.renderer
-                        .render(RenderData {
-                            camera_data: camera.data(),
-                            image: &self.image,
-                            scene,
-                            background,
-                            config: &self.config,
-                            cancel_event: Some(&self.render_image_event),
-                        })
-                        .and_then(|_| {
-                            self.screen_buffer
-                                .write()
-                                .map_err(|e| TracerError::FailedToAcquireLock(e.to_string()))
-                        })
-                        .and_then(|w_buffer| {
-                            self.renderer
-                                .image_data()
-                                .map(|image_data| (w_buffer, image_data))
-                        })
-                        .map(|(mut w_buffer, image_data)| {
-                            for (i, c) in image_data.rgb.into_iter().enumerate() {
-                                w_buffer[i] = tone_map.tone_map(c).as_color();
-                            }
-                        })
-                        .and_then(|_| {
+                        .render(
+                            RenderData {
+                                camera_data: camera.data(),
+                                image: &self.image,
+                                scene,
+                                background,
+                                config: &self.config,
+                                cancel_event: Some(&self.render_image_event),
+                            },
+                            image_buffer_writer,
+                        )
+                        .map(|_| {
                             if !self.render_image_event.status() {
                                 info!(
                                     self.log,
@@ -301,9 +262,11 @@ impl<'action> SceneController for InteractiveScene<'action> {
                                     Instant::now().duration_since(render_time).as_secs()
                                 );
                             } else {
+                                self.render_image_event.reset();
                                 info!(self.log, "Image render cancelled.");
                             }
-
+                            // TODO: Fix image action
+                            /*
                             self.image_action.action(
                                 &self.screen_buffer,
                                 &self.stop_event,
@@ -311,7 +274,7 @@ impl<'action> SceneController for InteractiveScene<'action> {
                                 &self.config,
                                 self.log.new(o!("scope" => "image-action")),
                                 &self.term,
-                            )
+                            )*/
                         })
                 },
             )

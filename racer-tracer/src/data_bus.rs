@@ -7,6 +7,7 @@ use bus::{Bus, BusReader};
 
 use crate::error::TracerError;
 
+#[derive(Clone)]
 pub struct DataWriter<T> {
     channel_name: String,
     sender: Sender<T>,

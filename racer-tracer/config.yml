@@ -1,5 +1,5 @@
 preview:
-  samples: 10
+  samples: 40
   max_depth: 10
   scale: 4
   num_threads_width: 10
@@ -31,7 +31,7 @@ loader:
 image_output_dir: "../"
 
 image_action:
-  WaitForSignal
+  None
 
 tone_map:
   Aces:

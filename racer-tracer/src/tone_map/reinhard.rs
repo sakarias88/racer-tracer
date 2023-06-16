@@ -13,11 +13,11 @@ impl Reinhard {
         }
     }
 
-    fn luminance(color: Color) -> f64 {
+    fn luminance(color: &Color) -> f64 {
         color.dot(&Color::new(0.2126, 0.7152, 0.0722))
     }
 
-    fn change_luminance(color: Color, luminance: f64) -> Color {
+    fn change_luminance(color: &Color, luminance: f64) -> Color {
         let color_luminance = Reinhard::luminance(color);
         color * (luminance / color_luminance)
     }
@@ -32,7 +32,7 @@ impl Default for Reinhard {
 }
 
 impl ToneMap for Reinhard {
-    fn tone_map(&self, color: crate::vec3::Color) -> crate::vec3::Color {
+    fn tone_map(&self, color: &Color) -> Color {
         let l_old = Reinhard::luminance(color);
         let numerator = l_old * (1.0 + (l_old / self.max_white_pow));
         let l_new = numerator / (1.0 + l_old);
