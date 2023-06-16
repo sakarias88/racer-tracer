@@ -9,37 +9,32 @@ use crate::{
     camera::{Camera, CameraData, SharedCamera},
     config::Config,
     error::TracerError,
-    gbuffer::ImageBufferWriter,
     geometry::Hittable,
     image::Image,
-    image_action::ImageAction,
+    image_buffer::ImageBufferWriter,
     key_inputs::{KeyEvent, ListenKeyEvents, MousePos},
     renderer::{RenderData, Renderer},
     scene::Scene,
-    terminal::Terminal,
 };
 
 use super::SceneController;
 
-pub struct InteractiveScene<'action> {
+pub struct InteractiveScene {
     camera_speed: f64,
     camera_sensitivity: f64,
     object_move_speed: f64,
     render_image_event: SignalEvent,
     stop_event: SignalEvent,
     log: Logger,
-    term: Terminal,
-    image_action: &'action dyn ImageAction,
     config: Config,
     image: Image,
     renderer: Box<dyn Renderer>,
     renderer_preview: Box<dyn Renderer>,
 }
 
-impl<'action> InteractiveScene<'action> {
+impl InteractiveScene {
     pub fn new(
         log: Logger,
-        term: Terminal,
         config: Config,
         image: Image,
         camera_data: CameraData,
@@ -53,8 +48,6 @@ impl<'action> InteractiveScene<'action> {
             render_image_event: SignalEvent::manual(false),
             stop_event: SignalEvent::manual(false),
             log,
-            term,
-            image_action: (&config.image_action).into(),
             image,
             renderer,
             renderer_preview,
@@ -63,7 +56,7 @@ impl<'action> InteractiveScene<'action> {
     }
 }
 
-impl<'action> SceneController for InteractiveScene<'action> {
+impl SceneController for InteractiveScene {
     fn update(
         &self,
         dt: f64,
@@ -206,6 +199,7 @@ impl<'action> SceneController for InteractiveScene<'action> {
         scene: &dyn Hittable,
         background: &dyn BackgroundColor,
         image_buffer_writer: &ImageBufferWriter,
+        image_completed: &SignalEvent,
     ) -> Result<(), TracerError> {
         if !scene_changed && !self.render_image_event.status() {
             return Ok(());
@@ -256,6 +250,7 @@ impl<'action> SceneController for InteractiveScene<'action> {
                         )
                         .map(|_| {
                             if !self.render_image_event.status() {
+                                image_completed.signal();
                                 info!(
                                     self.log,
                                     "It took {} seconds to render the image.",
@@ -265,16 +260,6 @@ impl<'action> SceneController for InteractiveScene<'action> {
                                 self.render_image_event.reset();
                                 info!(self.log, "Image render cancelled.");
                             }
-                            // TODO: Fix image action
-                            /*
-                            self.image_action.action(
-                                &self.screen_buffer,
-                                &self.stop_event,
-                                &self.render_image_event,
-                                &self.config,
-                                self.log.new(o!("scope" => "image-action")),
-                                &self.term,
-                            )*/
                         })
                 },
             )

@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use crate::{error::TracerError, gbuffer::ImageBufferWriter, image::Image, vec3::Color};
+use crate::{error::TracerError, image::Image, image_buffer::ImageBufferWriter, vec3::Color};
 
 use super::{RenderData, Renderer};
 
