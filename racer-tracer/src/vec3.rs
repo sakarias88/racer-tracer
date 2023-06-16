@@ -100,14 +100,6 @@ impl Vec3 {
         cross(self, v)
     }
 
-    pub fn as_color(&self) -> u32 {
-        let red: u32 = (self.pos[0] * 255.0) as u32;
-        let green: u32 = (self.pos[1] * 255.0) as u32;
-        let blue: u32 = (self.pos[2] * 255.0) as u32;
-        // XRGB
-        (255 << 24) | (red << 16) | green << 8 | blue
-    }
-
     pub fn random() -> Self {
         Vec3 {
             pos: [random_double(), random_double(), random_double()],

@@ -85,6 +85,7 @@ impl ImageBuffer {
         }
     }
 
+    #[allow(unused)]
     pub fn get_writer(&self) -> ImageBufferWriter {
         ImageBufferWriter::new(self.bus.get_writer())
     }
@@ -93,8 +94,8 @@ impl ImageBuffer {
         ImageBufferReader::new(&self.image, self.bus.get_reader())
     }
 
-    pub fn get_data_reader(&mut self) -> DataReader<ImageBufferEvent> {
-        self.bus.get_reader()
+    pub fn get_data_writer(&mut self) -> DataWriter<ImageBufferEvent> {
+        self.bus.get_writer()
     }
 
     pub fn update(&mut self) -> Result<(), TracerError> {
@@ -162,36 +163,38 @@ impl ScreenBuffer {
     }
 
     pub fn update(&mut self) -> Result<(), TracerError> {
-        self.reader.get_messages().and_then(|messages| {
-            messages.into_iter().try_for_each(|event| {
-                match event {
-                    ImageBufferEvent::BufferUpdate {
-                        mut rgb,
-                        r,
-                        c,
-                        width,
-                        height,
-                    } => {
-                        for row in 0..height {
-                            for column in 0..width {
-                                let buffer_index = row * width + column;
-                                rgb[buffer_index] = self.tone_map.tone_map(&rgb[buffer_index]);
-                                self.buffer[(r + row) * self.image.width + c + column] =
-                                    rgb[buffer_index]
-                            }
-                        }
-
-                        // Data processed.
-                        // Pass it to the readers.
-                        self.out.write(ImageBufferEvent::BufferUpdate {
-                            rgb,
+        self.bus.update().and_then(|_| {
+            self.reader.get_messages().and_then(|messages| {
+                messages.into_iter().try_for_each(|event| {
+                    match event {
+                        ImageBufferEvent::BufferUpdate {
+                            mut rgb,
                             r,
                             c,
                             width,
                             height,
-                        })
+                        } => {
+                            for row in 0..height {
+                                for column in 0..width {
+                                    let buffer_index = row * width + column;
+                                    rgb[buffer_index] = self.tone_map.tone_map(&rgb[buffer_index]);
+                                    self.buffer[(r + row) * self.image.width + c + column] =
+                                        rgb[buffer_index]
+                                }
+                            }
+
+                            // Data processed.
+                            // Pass it to the readers.
+                            self.out.write(ImageBufferEvent::BufferUpdate {
+                                rgb,
+                                r,
+                                c,
+                                width,
+                                height,
+                            })
+                        }
                     }
-                }
+                })
             })
         })
     }

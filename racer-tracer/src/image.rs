@@ -1,8 +1,4 @@
-use crate::{
-    data_bus::DataReader,
-    gbuffer::{ImageBufferEvent, ImageBufferWriter},
-    vec3::Color,
-};
+use crate::image_buffer::ImageBufferWriter;
 
 #[derive(Clone)]
 pub struct Image {

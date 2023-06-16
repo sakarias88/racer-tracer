@@ -7,9 +7,9 @@ use crate::{
     camera::CameraSharedData,
     config::{Config, RenderConfig, RendererConfig},
     error::TracerError,
-    gbuffer::ImageBufferWriter,
     geometry::Hittable,
     image::Image,
+    image_buffer::ImageBufferWriter,
     ray::Ray,
     vec3::{Color, Vec3},
 };

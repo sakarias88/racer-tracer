@@ -1,19 +1,16 @@
 pub mod interactive;
 
+use synchronoise::SignalEvent;
+
 use crate::{
     background_color::BackgroundColor,
     camera::{Camera, SharedCamera},
     error::TracerError,
-    gbuffer::ImageBufferWriter,
     geometry::Hittable,
-    image::Image,
+    image_buffer::ImageBufferWriter,
     key_inputs::{KeyEvent, ListenKeyEvents, MousePos},
     scene::Scene,
 };
-
-pub fn create_screen_buffer(image: &Image) -> Vec<u32> {
-    vec![0; image.width * image.height]
-}
 
 pub trait SceneController: Send + Sync {
     fn update(
@@ -33,7 +30,8 @@ pub trait SceneController: Send + Sync {
         camera: &SharedCamera,
         scene: &dyn Hittable,
         background: &dyn BackgroundColor,
-        gbuffer_writer: &ImageBufferWriter,
+        image_buffer_writer: &ImageBufferWriter,
+        rendered_image_completed: &SignalEvent,
     ) -> Result<(), TracerError>;
 
     // Called when the application wants to exit.
