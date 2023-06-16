@@ -73,3 +73,6 @@ camera:
   look_at:
     pos: [ 0, 0, 0 ]
   speed: 0.00002
+
+tone_map:
+  None
