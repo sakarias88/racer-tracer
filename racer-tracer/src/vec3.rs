@@ -325,6 +325,14 @@ impl ops::Mul<f64> for Vec3 {
     }
 }
 
+impl ops::Mul<f64> for &Vec3 {
+    type Output = Vec3;
+
+    fn mul(self, rhs: f64) -> Self::Output {
+        Vec3::new(self.pos[0] * rhs, self.pos[1] * rhs, self.pos[2] * rhs)
+    }
+}
+
 impl ops::Mul<&Vec3> for f64 {
     type Output = Vec3;
 

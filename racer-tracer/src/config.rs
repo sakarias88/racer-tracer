@@ -95,7 +95,7 @@ pub enum SceneLoaderConfig {
 #[derive(StructOpt, Debug, Clone, Deserialize, Default)]
 pub enum ImageActionConfig {
     #[default]
-    WaitForSignal,
+    None,
     SavePng,
 }
 
@@ -122,8 +122,8 @@ impl FromStr for ImageActionConfig {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "png" => Ok(ImageActionConfig::SavePng),
-            "show" => Ok(ImageActionConfig::WaitForSignal),
-            _ => Ok(ImageActionConfig::WaitForSignal),
+            "none" => Ok(ImageActionConfig::None),
+            _ => Ok(ImageActionConfig::None),
         }
     }
 }

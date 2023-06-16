@@ -7,7 +7,6 @@ use crate::util::{degrees_to_radians, random_double_range, random_in_unit_disk};
 use crate::vec3::Vec3;
 
 #[derive(Clone)]
-#[allow(dead_code)]
 pub enum CameraEvent {
     Pos {
         origin: Vec3,

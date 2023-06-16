@@ -70,7 +70,7 @@ impl Hable {
 }
 
 impl ToneMap for Hable {
-    fn tone_map(&self, color: crate::vec3::Color) -> crate::vec3::Color {
+    fn tone_map(&self, color: &Color) -> Color {
         let linear_color = self.hable(color * self.exposure_bias);
         Color::new(
             linear_color.x() * self.white_scale,

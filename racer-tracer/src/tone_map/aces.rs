@@ -15,7 +15,7 @@ impl Aces {
         }
     }
 
-    fn mul(matrix: [Color; 3], color: Color) -> Color {
+    fn mul(matrix: [Color; 3], color: &Color) -> Color {
         let x = matrix[0][0] * color[0] + matrix[0][1] * color[1] + matrix[0][2] * color[2];
         let y = matrix[1][0] * color[0] + matrix[1][1] * color[1] + matrix[1][2] * color[2];
         let z = matrix[2][0] * color[0] + matrix[2][1] * color[1] + matrix[2][2] * color[2];
@@ -47,10 +47,10 @@ impl Default for Aces {
 }
 
 impl ToneMap for Aces {
-    fn tone_map(&self, color: Color) -> Color {
+    fn tone_map(&self, color: &Color) -> Color {
         Aces::mul(
             self.output_matrix,
-            Aces::rtt_and_odt_fit(Aces::mul(self.input_matrix, color)),
+            &Aces::rtt_and_odt_fit(Aces::mul(self.input_matrix, color)),
         )
     }
 }

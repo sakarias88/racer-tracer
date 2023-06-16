@@ -1,3 +1,9 @@
+use crate::{
+    data_bus::DataReader,
+    gbuffer::{ImageBufferEvent, ImageBufferWriter},
+    vec3::Color,
+};
+
 #[derive(Clone)]
 pub struct Image {
     pub aspect_ratio: f64,
@@ -28,4 +34,5 @@ pub struct SubImage {
     pub screen_height: usize,
     pub width: usize,
     pub height: usize,
+    pub writer: ImageBufferWriter,
 }

@@ -12,7 +12,7 @@ impl None {
 }
 
 impl ToneMap for None {
-    fn tone_map(&self, color: Color) -> crate::vec3::Color {
-        color
+    fn tone_map(&self, color: &Color) -> crate::vec3::Color {
+        *color
     }
 }

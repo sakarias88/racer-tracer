@@ -4,11 +4,11 @@ use crate::{
     background_color::BackgroundColor,
     camera::{Camera, SharedCamera},
     error::TracerError,
+    gbuffer::ImageBufferWriter,
     geometry::Hittable,
     image::Image,
     key_inputs::{KeyEvent, ListenKeyEvents, MousePos},
     scene::Scene,
-    tone_map::ToneMap,
 };
 
 pub fn create_screen_buffer(image: &Image) -> Vec<u32> {
@@ -33,12 +33,8 @@ pub trait SceneController: Send + Sync {
         camera: &SharedCamera,
         scene: &dyn Hittable,
         background: &dyn BackgroundColor,
-        tone_mapping: &dyn ToneMap,
+        gbuffer_writer: &ImageBufferWriter,
     ) -> Result<(), TracerError>;
-
-    // Returns the screen buffer produced by the scene controller.
-    // Returns None if no new buffer is available
-    fn get_buffer(&self) -> Result<Option<Vec<u32>>, TracerError>;
 
     // Called when the application wants to exit.
     fn stop(&self);

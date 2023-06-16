@@ -12,7 +12,7 @@ use self::none::None;
 use self::reinhard::Reinhard;
 
 pub trait ToneMap: Send + Sync {
-    fn tone_map(&self, color: Color) -> Color;
+    fn tone_map(&self, color: &Color) -> Color;
 }
 
 impl From<&ToneMapConfig> for Box<dyn ToneMap> {
