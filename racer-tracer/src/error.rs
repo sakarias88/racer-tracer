@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-#[derive(Error, Debug, PartialEq)]
+#[derive(Error, Debug, Eq, PartialEq)]
 pub enum TracerError {
     #[error("Failed to create window: {0}")]
     FailedToCreateWindow(String),

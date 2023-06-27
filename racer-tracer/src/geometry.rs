@@ -22,10 +22,18 @@ pub struct HitRecord {
     pub material: Arc<dyn Material>,
     pub u: f64,
     pub v: f64,
+    pub obj_id: usize,
 }
 
 impl HitRecord {
-    fn new(point: Vec3, t: f64, material: Arc<dyn Material>, u: f64, v: f64) -> Self {
+    fn new(
+        point: Vec3,
+        t: f64,
+        material: Arc<dyn Material>,
+        u: f64,
+        v: f64,
+        obj_id: usize,
+    ) -> Self {
         Self {
             point,
             normal: Vec3::default(),
@@ -34,6 +42,7 @@ impl HitRecord {
             material,
             u,
             v,
+            obj_id,
         }
     }
 

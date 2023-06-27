@@ -3,9 +3,10 @@ use rayon::prelude::*;
 use crate::{
     camera::{Camera, CameraSharedData},
     config::RenderConfig,
+    data_bus::DataWriter,
     error::TracerError,
     image::SubImage,
-    image_buffer::ImageBufferWriter,
+    image_buffer::ImageBufferEvent,
     renderer::{do_cancel, ray_color, Renderer},
     util::random_double,
     vec3::{Color, Vec3},
@@ -26,7 +27,7 @@ impl CpuRenderer {
         &self,
         rd: &RenderData,
         camera_data: &CameraSharedData,
-        mut image: SubImage,
+        image: SubImage<ImageBufferEvent>,
     ) -> Result<(), TracerError> {
         let mut buffer = vec![Vec3::default(); image.height * image.width];
         for row in 0..image.height {
@@ -37,12 +38,16 @@ impl CpuRenderer {
                 for _ in 0..rd.config.render.samples {
                     let v: f64 = ((image.y + row) as f64 + random_double())
                         / (image.screen_height - 1) as f64;
-                    color.add(ray_color(
-                        rd.scene,
-                        &Camera::get_ray(camera_data, u, v),
-                        rd.background,
-                        rd.config.render.max_depth,
-                    ));
+                    color.add(
+                        ray_color(
+                            rd.scene,
+                            &Camera::get_ray(camera_data, u, v),
+                            rd.background,
+                            rd.config.render.max_depth,
+                            &camera_data.origin,
+                        )
+                        .rgb,
+                    );
                 }
                 buffer[row * image.width + column] = color.scale_sqrt(self.config.samples);
             }
@@ -56,16 +61,20 @@ impl CpuRenderer {
             return Ok(());
         }
 
-        image
-            .writer
-            .write(buffer, image.y, image.x, image.width, image.height)
+        image.writer.write(ImageBufferEvent::BufferUpdate {
+            rgb: buffer,
+            r: image.y,
+            c: image.x,
+            width: image.width,
+            height: image.height,
+        })
     }
 
-    pub fn prepare_threads(
+    pub fn prepare_threads<T: Clone>(
         rd: &RenderData,
         conf: &RenderConfig,
-        writer: &ImageBufferWriter,
-    ) -> Result<Vec<SubImage>, TracerError> {
+        writer: &DataWriter<T>,
+    ) -> Result<Vec<SubImage<T>>, TracerError> {
         let width_step = rd.image.width / conf.num_threads_width;
         let height_step = rd.image.height / conf.num_threads_height;
 
@@ -99,15 +108,19 @@ impl CpuRenderer {
                                     height_step
                                 },
                             })
-                            .collect::<Vec<SubImage>>()
+                            .collect::<Vec<SubImage<T>>>()
                     })
-                    .collect::<Vec<SubImage>>()
+                    .collect::<Vec<SubImage<T>>>()
             })
     }
 }
 
 impl Renderer for CpuRenderer {
-    fn render(&self, rd: RenderData, writer: &ImageBufferWriter) -> Result<(), TracerError> {
+    fn render(
+        &self,
+        rd: RenderData,
+        writer: &DataWriter<ImageBufferEvent>,
+    ) -> Result<(), TracerError> {
         CpuRenderer::prepare_threads(&rd, &self.config, writer).and_then(|images| {
             images
                 .into_par_iter()

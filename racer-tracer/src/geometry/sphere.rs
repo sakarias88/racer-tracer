@@ -28,7 +28,14 @@ impl Sphere {
 }
 
 impl HittableSceneObject for Sphere {
-    fn obj_hit(&self, obj: &SceneObject, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
+    fn obj_hit(
+        &self,
+        obj: &SceneObject,
+        ray: &Ray,
+        t_min: f64,
+        t_max: f64,
+        obj_id: usize,
+    ) -> Option<HitRecord> {
         let oc = ray.origin() - obj.pos();
         let a = ray.direction().length_squared();
         let half_b = oc.dot(ray.direction());
@@ -55,7 +62,7 @@ impl HittableSceneObject for Sphere {
         let outward_normal = (point - obj.pos()) / self.radius;
         let (u, v) = Sphere::get_sphere_uv(&outward_normal);
 
-        let mut hit_record = HitRecord::new(point, root, obj.material(), u, v);
+        let mut hit_record = HitRecord::new(point, root, obj.material(), u, v, obj_id);
         hit_record.set_face_normal(ray, outward_normal);
         Some(hit_record)
     }

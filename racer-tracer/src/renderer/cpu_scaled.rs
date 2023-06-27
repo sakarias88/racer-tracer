@@ -3,9 +3,10 @@ use rayon::prelude::*;
 use crate::{
     camera::{Camera, CameraSharedData},
     config::RenderConfig,
+    data_bus::DataWriter,
     error::TracerError,
     image::{Image, SubImage},
-    image_buffer::ImageBufferWriter,
+    image_buffer::ImageBufferEvent,
     renderer::{cpu::CpuRenderer, do_cancel, ray_color, Renderer},
     util::random_double,
     vec3::{Color, Vec3},
@@ -45,7 +46,7 @@ impl CpuRendererScaled {
         &self,
         rd: &RenderData,
         camera_data: &CameraSharedData,
-        mut image: SubImage,
+        image: SubImage<ImageBufferEvent>,
     ) -> Result<(), TracerError> {
         let scaled_width = image.width / self.scale_width;
         let scaled_height = image.height / self.scale_height;
@@ -59,12 +60,16 @@ impl CpuRendererScaled {
                 for _ in 0..self.config.samples {
                     let v: f64 = ((image.y + row * self.scale_height) as f64 + random_double())
                         / (image.screen_height - 1) as f64;
-                    color.add(ray_color(
-                        rd.scene,
-                        &Camera::get_ray(camera_data, u, v),
-                        rd.background,
-                        self.config.max_depth,
-                    ));
+                    color.add(
+                        ray_color(
+                            rd.scene,
+                            &Camera::get_ray(camera_data, u, v),
+                            rd.background,
+                            self.config.max_depth,
+                            &camera_data.origin,
+                        )
+                        .rgb,
+                    );
                 }
 
                 // Scale up color
@@ -83,10 +88,13 @@ impl CpuRendererScaled {
                 return Ok(());
             }
         }
-
-        image
-            .writer
-            .write(buffer, image.y, image.x, image.width, image.height)
+        image.writer.write(ImageBufferEvent::BufferUpdate {
+            rgb: buffer,
+            r: image.y,
+            c: image.x,
+            width: image.width,
+            height: image.height,
+        })
     }
 }
 
@@ -94,7 +102,7 @@ impl Renderer for CpuRendererScaled {
     fn render(
         &self,
         rd: RenderData,
-        writer: &ImageBufferWriter,
+        writer: &DataWriter<ImageBufferEvent>,
     ) -> Result<(), crate::error::TracerError> {
         CpuRenderer::prepare_threads(&rd, &self.config, writer).and_then(|images| {
             images

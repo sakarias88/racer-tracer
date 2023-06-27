@@ -2,7 +2,10 @@
 
 use std::path::Path;
 
-use crate::{error::TracerError, image::Image, image_buffer::ImageBufferWriter, vec3::Color};
+use crate::{
+    data_bus::DataWriter, error::TracerError, image::Image, image_buffer::ImageBufferEvent,
+    vec3::Color,
+};
 
 use super::{RenderData, Renderer};
 
@@ -43,8 +46,19 @@ impl ImageDisplayer {
 }
 
 impl Renderer for ImageDisplayer {
-    fn render(&self, rd: RenderData, writer: &ImageBufferWriter) -> Result<(), TracerError> {
-        let mut writer = writer.clone();
-        writer.write(self.buffer.clone(), 0, 0, rd.image.width, rd.image.height)
+    fn render(
+        &self,
+        rd: RenderData,
+        writer: &DataWriter<ImageBufferEvent>,
+    ) -> Result<(), TracerError> {
+        let writer = writer.clone();
+
+        writer.write(ImageBufferEvent::BufferUpdate {
+            rgb: self.buffer.clone(),
+            r: 0,
+            c: 0,
+            width: rd.image.width,
+            height: rd.image.height,
+        })
     }
 }

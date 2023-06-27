@@ -27,6 +27,7 @@ impl HittableSceneObject for Translate {
         ray: &crate::ray::Ray,
         t_min: f64,
         t_max: f64,
+        _obj_id: usize,
     ) -> Option<HitRecord> {
         let moved = Ray::new(ray.origin() - self.offset, *ray.direction(), ray.time());
         match self.object.hit(&moved, t_min, t_max) {

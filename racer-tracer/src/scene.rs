@@ -22,7 +22,17 @@ use crate::{
 };
 
 pub trait HittableSceneObject: Send + Sync + DynClone {
-    fn obj_hit(&self, obj: &SceneObject, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord>;
+    fn obj_hit(
+        &self,
+        obj: &SceneObject,
+        ray: &Ray,
+        t_min: f64,
+        t_max: f64,
+        // TODO: It's weird to send obj_id since it's only used to
+        // create new HitRecords. Figure out a way to insert it
+        // further up the stack.
+        obj_id: usize,
+    ) -> Option<HitRecord>;
     fn create_bounding_box(&self, pos: &Vec3, time_a: f64, time_b: f64) -> Aabb;
     fn update_pos(&mut self, pos_delta: &Vec3);
 }
@@ -35,7 +45,10 @@ pub struct SceneObject {
     aabb: Aabb,
     material: Arc<dyn Material>,
     hittable: Box<dyn HittableSceneObject>,
+    obj_id: usize,
 }
+
+static SCENE_OBJECT_ID: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(1);
 
 impl SceneObject {
     pub fn new(
@@ -44,12 +57,18 @@ impl SceneObject {
         material: Arc<dyn Material>,
         hittable: Box<dyn HittableSceneObject>,
     ) -> Self {
+        let obj_id = SCENE_OBJECT_ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         Self {
             pos,
             aabb,
             material,
             hittable,
+            obj_id,
         }
+    }
+
+    pub fn id(&self) -> usize {
+        self.obj_id
     }
 
     pub fn material(&self) -> Arc<dyn Material> {
@@ -78,7 +97,7 @@ impl SceneObject {
 
 impl Hittable for SceneObject {
     fn hit(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
-        self.hittable.obj_hit(self, ray, t_min, t_max)
+        self.hittable.obj_hit(self, ray, t_min, t_max, self.obj_id)
     }
 
     fn bounding_box(&self, _time_a: f64, _time_b: f64) -> &Aabb {

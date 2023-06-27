@@ -85,6 +85,7 @@ impl HittableSceneObject for Boxx {
         ray: &crate::ray::Ray,
         t_min: f64,
         t_max: f64,
+        _obj_id: usize,
     ) -> Option<super::HitRecord> {
         let mut rec = None;
         let mut closes_so_far = t_max;

@@ -8,10 +8,11 @@ use crate::{
     background_color::BackgroundColor,
     camera::{Camera, CameraData, SharedCamera},
     config::Config,
+    data_bus::DataWriter,
     error::TracerError,
     geometry::Hittable,
     image::Image,
-    image_buffer::ImageBufferWriter,
+    image_buffer::ImageBufferEvent,
     key_inputs::{KeyEvent, ListenKeyEvents, MousePos},
     renderer::{RenderData, Renderer},
     scene::Scene,
@@ -198,7 +199,7 @@ impl SceneController for InteractiveScene {
         camera: &SharedCamera,
         scene: &dyn Hittable,
         background: &dyn BackgroundColor,
-        image_buffer_writer: &ImageBufferWriter,
+        image_buffer_writer: &DataWriter<ImageBufferEvent>,
         image_completed: &SignalEvent,
     ) -> Result<(), TracerError> {
         if !scene_changed && !self.render_image_event.status() {

@@ -18,7 +18,6 @@ impl ImageAction for SavePng {
     ) -> Result<(), TracerError> {
         match &config.image_output_dir {
             Some(image_dir) => {
-                println!("A");
                 let png_data = screen_buffer
                     .iter()
                     .map(|v| {
