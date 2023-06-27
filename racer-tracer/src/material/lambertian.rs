@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
+    geometry::HitRecord,
     material::Material,
     ray::Ray,
     texture::{solid_color::SolidColor, Texture},
@@ -22,11 +23,7 @@ impl Lambertian {
 }
 
 impl Material for Lambertian {
-    fn scatter(
-        &self,
-        ray: &crate::ray::Ray,
-        rec: &crate::geometry::HitRecord,
-    ) -> Option<(Ray, Color)> {
+    fn scatter(&self, ray: &Ray, rec: &HitRecord) -> Option<(Ray, Color)> {
         let mut scatter_direction = rec.normal + random_unit_vector();
 
         // Catch bad scatter direction

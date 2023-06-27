@@ -41,7 +41,14 @@ impl MovingSphere {
 }
 
 impl HittableSceneObject for MovingSphere {
-    fn obj_hit(&self, obj: &SceneObject, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
+    fn obj_hit(
+        &self,
+        obj: &SceneObject,
+        ray: &Ray,
+        t_min: f64,
+        t_max: f64,
+        obj_id: usize,
+    ) -> Option<HitRecord> {
         let oc = ray.origin() - self.pos(obj, ray.time());
         let a = ray.direction().length_squared();
         let half_b = oc.dot(ray.direction());
@@ -68,7 +75,7 @@ impl HittableSceneObject for MovingSphere {
         let outward_normal = (point - self.pos(obj, ray.time())) / self.radius;
         let (u, v) = Sphere::get_sphere_uv(&point);
 
-        let mut hit_record = HitRecord::new(point, root, obj.material(), u, v);
+        let mut hit_record = HitRecord::new(point, root, obj.material(), u, v, obj_id);
         hit_record.set_face_normal(ray, outward_normal);
         Some(hit_record)
     }

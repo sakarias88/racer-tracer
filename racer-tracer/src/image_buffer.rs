@@ -1,5 +1,3 @@
-// TODO : Rename this file
-
 use crate::{
     data_bus::{DataBus, DataReader, DataWriter},
     error::TracerError,
@@ -86,8 +84,8 @@ impl ImageBuffer {
     }
 
     #[allow(unused)]
-    pub fn get_writer(&self) -> ImageBufferWriter {
-        ImageBufferWriter::new(self.bus.get_writer())
+    pub fn get_writer(&self) -> DataWriter<ImageBufferEvent> {
+        self.bus.get_writer()
     }
 
     pub fn get_reader(&mut self) -> ImageBufferReader {
@@ -100,34 +98,6 @@ impl ImageBuffer {
 
     pub fn update(&mut self) -> Result<(), TracerError> {
         self.bus.update()
-    }
-}
-
-#[derive(Clone)]
-pub struct ImageBufferWriter {
-    writer: DataWriter<ImageBufferEvent>,
-}
-
-impl ImageBufferWriter {
-    pub fn new(writer: DataWriter<ImageBufferEvent>) -> Self {
-        Self { writer }
-    }
-
-    pub fn write(
-        &mut self,
-        rgb: Vec<Color>,
-        r: usize,
-        c: usize,
-        width: usize,
-        height: usize,
-    ) -> Result<(), TracerError> {
-        self.writer.write(ImageBufferEvent::BufferUpdate {
-            rgb,
-            r,
-            c,
-            width,
-            height,
-        })
     }
 }
 
@@ -199,8 +169,8 @@ impl ScreenBuffer {
         })
     }
 
-    pub fn get_writer(&self) -> ImageBufferWriter {
-        ImageBufferWriter::new(self.bus.get_writer())
+    pub fn get_writer(&self) -> DataWriter<ImageBufferEvent> {
+        self.bus.get_writer()
     }
 
     pub fn rgb(&self) -> &[Color] {

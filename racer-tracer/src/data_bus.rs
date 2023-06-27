@@ -8,12 +8,18 @@ use bus::{Bus, BusReader};
 use crate::error::TracerError;
 
 #[derive(Clone)]
-pub struct DataWriter<T> {
+pub struct DataWriter<T>
+where
+    T: Clone,
+{
     channel_name: String,
     sender: Sender<T>,
 }
 
-impl<T> DataWriter<T> {
+impl<T> DataWriter<T>
+where
+    T: Clone,
+{
     fn new(channel_name: String, sender: Sender<T>) -> Self {
         Self {
             channel_name,
@@ -59,7 +65,7 @@ impl<T: Clone + Sync> DataReader<T> {
 
         match res {
             Ok(_) => Ok(buf),
-            Err(e) if e == RecvTimeoutError::Timeout => Ok(buf),
+            Err(RecvTimeoutError::Timeout) => Ok(buf),
             Err(e) => Err(TracerError::BusReadError(
                 self.channel_name.clone(),
                 e.to_string(),
@@ -106,7 +112,7 @@ impl<T: Clone + Sync> DataBus<T> {
 
         match res {
             Ok(_) => Ok(()),
-            Err(e) if e == TracerError::BusTimeoutError() => Ok(()),
+            Err(TracerError::BusTimeoutError()) => Ok(()),
             Err(e) => Err(TracerError::RecieveError(e.to_string())),
         }
     }

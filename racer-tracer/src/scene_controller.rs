@@ -5,9 +5,10 @@ use synchronoise::SignalEvent;
 use crate::{
     background_color::BackgroundColor,
     camera::{Camera, SharedCamera},
+    data_bus::DataWriter,
     error::TracerError,
     geometry::Hittable,
-    image_buffer::ImageBufferWriter,
+    image_buffer::ImageBufferEvent,
     key_inputs::{KeyEvent, ListenKeyEvents, MousePos},
     scene::Scene,
 };
@@ -30,7 +31,7 @@ pub trait SceneController: Send + Sync {
         camera: &SharedCamera,
         scene: &dyn Hittable,
         background: &dyn BackgroundColor,
-        image_buffer_writer: &ImageBufferWriter,
+        image_buffer_writer: &DataWriter<ImageBufferEvent>,
         rendered_image_completed: &SignalEvent,
     ) -> Result<(), TracerError>;
 

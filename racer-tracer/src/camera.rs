@@ -55,7 +55,7 @@ pub struct SharedCamera {
 
 #[derive(Clone)]
 pub struct CameraSharedData {
-    origin: Vec3,
+    pub origin: Vec3,
     upper_left_corner: Vec3,
     forward: Vec3,
     right: Vec3,
@@ -78,6 +78,11 @@ impl SharedCamera {
             data,
             changed: true,
         }
+    }
+
+    #[allow(dead_code)]
+    pub fn pos(&self) -> &Vec3 {
+        &self.data.origin
     }
 
     pub fn data(&self) -> &CameraSharedData {

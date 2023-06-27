@@ -1,4 +1,4 @@
-use crate::image_buffer::ImageBufferWriter;
+use crate::data_bus::DataWriter;
 
 #[derive(Clone)]
 pub struct Image {
@@ -23,12 +23,12 @@ impl Image {
     }
 }
 
-pub struct SubImage {
+pub struct SubImage<T: Clone> {
     pub x: usize,
     pub y: usize,
     pub screen_width: usize,
     pub screen_height: usize,
     pub width: usize,
     pub height: usize,
-    pub writer: ImageBufferWriter,
+    pub writer: DataWriter<T>,
 }

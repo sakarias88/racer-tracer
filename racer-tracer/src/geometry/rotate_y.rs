@@ -28,7 +28,14 @@ impl RotateY {
 }
 
 impl HittableSceneObject for RotateY {
-    fn obj_hit(&self, _obj: &SceneObject, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
+    fn obj_hit(
+        &self,
+        _obj: &SceneObject,
+        ray: &Ray,
+        t_min: f64,
+        t_max: f64,
+        _obj_id: usize,
+    ) -> Option<HitRecord> {
         let mut origin = *ray.origin();
         let mut direction = *ray.direction();
 

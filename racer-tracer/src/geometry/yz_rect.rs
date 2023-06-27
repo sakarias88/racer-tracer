@@ -24,6 +24,7 @@ impl HittableSceneObject for YzRect {
         ray: &crate::ray::Ray,
         t_min: f64,
         t_max: f64,
+        obj_id: usize,
     ) -> Option<HitRecord> {
         let origin = ray.origin();
         let direction = ray.direction();
@@ -41,7 +42,7 @@ impl HittableSceneObject for YzRect {
 
         let u = (y - self.y0) / (self.y1 - self.y0);
         let v = (z - self.z0) / (self.z1 - self.z0);
-        let mut hit_record = HitRecord::new(ray.at(t), t, obj.material(), u, v);
+        let mut hit_record = HitRecord::new(ray.at(t), t, obj.material(), u, v, obj_id);
         hit_record.set_face_normal(ray, Vec3::new(1.0, 0.0, 0.0));
 
         Some(hit_record)
